@@ -21,6 +21,8 @@ class Personagem(Base):
     pericias = Column(String, default="[]")  # Dados das perícias do personagem em formato JSON
     habilidades = Column(String, default="[]")  # Habilidades do personagem em formato JSON
     rituais = Column(String, default="[]")  # Rituais do personagem em formato JSON
+    patente = Column(String, default="Recruta")  # Patente do personagem na Ordem
+    inventario = Column(String, default="[]")  # Itens do inventário em formato JSON
     
     
 

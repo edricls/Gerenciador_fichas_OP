@@ -111,3 +111,74 @@ def calcular_recursos(personagem, pericias=None, nivel=None, atributos=None, val
         nome: valor + int(ajustes.get(nome, 0))
         for nome, valor in bases.items()
     }
+
+
+LIMITES_ITENS_POR_PATENTE = {
+    "Mundano": {"I": 1, "II": 0, "III": 0, "IV": 0},
+    "Recruta": {"I": 2, "II": 0, "III": 0, "IV": 0},
+    "Operador": {"I": 3, "II": 1, "III": 0, "IV": 0},
+    "Agente Especial": {"I": 3, "II": 2, "III": 1, "IV": 0},
+    "Oficial de Operações": {"I": 3, "II": 3, "III": 2, "IV": 1},
+    "Agente de Elite": {"I": 3, "II": 3, "III": 3, "IV": 2},
+}
+
+
+def obter_limite_categoria(patente, categoria):
+    """Retorna o limite de itens da categoria para a patente; None significa sem limite (categoria 0)."""
+    if categoria == "0":
+        return None
+    limites = LIMITES_ITENS_POR_PATENTE.get(patente, LIMITES_ITENS_POR_PATENTE["Recruta"])
+    return limites.get(categoria, 0)
+
+
+def obter_forca(atributos_texto):
+    for atributo in (atributos_texto or "").split(","):
+        nome, separador, valor = atributo.partition("=")
+        if separador and nome.strip() == "Força":
+            try:
+                return int(valor.strip())
+            except ValueError:
+                return 0
+    return 0
+
+
+def calcular_capacidade_carga(atributos_texto):
+    forca = obter_forca(atributos_texto)
+    if forca <= 0:
+        return 2
+    return forca * 5
+
+
+def contar_itens_por_categoria(itens):
+    contagem = {}
+    for item in itens:
+        categoria = item.get("categoria", "0")
+        contagem[categoria] = contagem.get(categoria, 0) + 1
+    return contagem
+
+
+def calcular_peso_total(itens):
+    total = 0
+    for item in itens:
+        try:
+            total += float(item.get("peso", 0))
+        except (TypeError, ValueError):
+            pass
+    return total
+
+
+def validar_limite_categoria(itens, patente, categoria, ignorar_indice=None):
+    """Retorna uma mensagem de erro se adicionar um item da categoria ultrapassar o limite da patente."""
+    limite = obter_limite_categoria(patente, categoria)
+    if limite is None:
+        return None
+    quantidade = sum(
+        1
+        for indice, item in enumerate(itens)
+        if indice != ignorar_indice and item.get("categoria", "0") == categoria
+    )
+    if quantidade >= limite:
+        if limite == 0:
+            return f"A patente {patente} não permite itens de categoria {categoria}."
+        return f"A patente {patente} permite no máximo {limite} item(ns) de categoria {categoria}."
+    return None

@@ -85,6 +85,10 @@ def aplicar_tema():
         text_color=CORES["texto"],
         text_color_disabled=CORES["texto_suave"],
     )
+    tema["CTkProgressBar"].update(
+        fg_color=CORES["superficie_alt"],
+        progress_color=CORES["destaque"],
+    )
     tema["CTkScrollbar"].update(
         button_color=CORES["borda"],
         button_hover_color=CORES["texto_suave"],

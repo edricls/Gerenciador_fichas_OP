@@ -8,6 +8,12 @@ from app.character_rules import (
     obter_limites_nivel,
     obter_nome_nivel,
     validar_nex_texto,
+    calcular_capacidade_carga,
+    calcular_peso_total,
+    contar_itens_por_categoria,
+    obter_forca,
+    obter_limite_categoria,
+    validar_limite_categoria,
 )
 from app.character_storage import (
     atualizar_personagem,
@@ -37,6 +43,16 @@ from app.gui_data import (
     RITUAIS_POR_SIMBOLO,
     DESCRICOES_RITUAIS,
     TEXTO_PADRAO_DESCRICAO,
+    PATENTES,
+    PATENTE_PADRAO,
+    CATEGORIAS_ITENS,
+    TIPOS_ITENS,
+)
+from app.inventario_storage import (
+    carregar_inventario,
+    carregar_patente,
+    salvar_inventario,
+    salvar_patente,
 )
 from app.models import Personagem
 from app.pericia_storage import (
@@ -81,11 +97,11 @@ def criar_avatar(master, nome, tamanho):
     return avatar
 
 
-def criar_chip(master, texto):
+def criar_chip(master, texto, fg_color=None):
     return ctk.CTkLabel(
         master,
         text=texto,
-        fg_color=CORES["superficie_alt"],
+        fg_color=fg_color or CORES["superficie_alt"],
         text_color=CORES["texto_suave"],
         corner_radius=8,
         height=24,
@@ -121,6 +137,14 @@ def criar_titulo_secao(master, texto):
 def texto_resumo_personagem(personagem):
     origem_valor = getattr(personagem, "origem", None) or ""
     return f"{personagem.classe}  ·  Nível {personagem.nivel}  ·  NEX {personagem.nex}%  ·  {origem_valor or 'Origem não informada'}"
+
+
+def formatar_peso(valor):
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return "0"
+    return f"{numero:g}".replace(".", ",")
 
 
 def criar_tabview(master, **kwargs):
@@ -536,7 +560,9 @@ class GerenciadorGUI(ctk.CTk):
                 historia=self.entradas["historia"].get("1.0", "end").strip(),
                 pericias=json.dumps(dados_pericias_padrao(PERICIAS, ATRIBUTOS_PERICIAS)),
                 habilidades=json.dumps([]),
-                rituais=json.dumps([])
+                rituais=json.dumps([]),
+                patente=PATENTE_PADRAO,
+                inventario=json.dumps([])
             )
 
             salvar_personagem_no_banco(novo_p)
@@ -1005,6 +1031,8 @@ class GerenciadorGUI(ctk.CTk):
         historia_text.insert("1.0", personagem.historia)
         historia_text.configure(state="disabled")
 
+        atualizar_inventario = self._criar_aba_inventario(tab_inventario, personagem)
+
         tab_edicao = tabview.add("Editar Ficha")
         self._criar_aba_edicao(
             tabview,
@@ -1024,6 +1052,7 @@ class GerenciadorGUI(ctk.CTk):
                 "valor_origem": valor_origem,
                 "valores_atributos_ficha": valores_atributos_ficha,
                 "historia_text": historia_text,
+                "atualizar_inventario": atualizar_inventario,
             },
         )
 
@@ -1278,6 +1307,300 @@ class GerenciadorGUI(ctk.CTk):
             command=adicionar_ritual
         ).pack(side="bottom", anchor="w", padx=20, pady=20)
 
+    def _criar_aba_inventario(self, tab_inventario, personagem):
+        inventario_frame = ctk.CTkScrollableFrame(tab_inventario, fg_color="transparent")
+        inventario_frame.pack(fill="both", expand=True, padx=4, pady=(0, 4))
+        inventario_frame.grid_columnconfigure((0, 1), weight=1, uniform="inventario")
+
+        filtro_tipo = {"valor": "Todos"}
+
+        # --- Patente ---
+        patente_card = ctk.CTkFrame(inventario_frame, **ESTILO_CARD)
+        patente_card.grid(row=0, column=0, sticky="nsew", padx=(8, 6), pady=(8, 12))
+        criar_titulo_secao(patente_card, "Patente").pack(anchor="w", padx=20, pady=(16, 8))
+
+        def alterar_patente(patente):
+            salvar_patente(personagem, patente)
+            atualizar_inventario()
+
+        patente_menu = ctk.CTkOptionMenu(
+            patente_card,
+            values=PATENTES,
+            height=36,
+            command=alterar_patente,
+            dynamic_resizing=False
+        )
+        patente_menu.set(carregar_patente(personagem))
+        patente_menu.pack(fill="x", padx=20, pady=(0, 6))
+        ctk.CTkLabel(
+            patente_card,
+            text="Define quantos itens de cada categoria o agente pode levar.",
+            font=fonte(12),
+            anchor="w",
+            justify="left",
+            wraplength=300,
+            **ESTILO_ROTULO
+        ).pack(fill="x", padx=20, pady=(0, 16))
+
+        # --- Carga ---
+        carga_card = ctk.CTkFrame(inventario_frame, **ESTILO_CARD)
+        carga_card.grid(row=0, column=1, sticky="nsew", padx=(6, 8), pady=(8, 12))
+        criar_titulo_secao(carga_card, "Carga").pack(anchor="w", padx=20, pady=(16, 4))
+        carga_valor = ctk.CTkLabel(carga_card, text="", font=fonte(22, "bold"), anchor="w")
+        carga_valor.pack(anchor="w", padx=20)
+        carga_barra = ctk.CTkProgressBar(carga_card, height=10)
+        carga_barra.pack(fill="x", padx=20, pady=(6, 6))
+        carga_status = ctk.CTkLabel(carga_card, text="", font=fonte(12), anchor="w")
+        carga_status.pack(anchor="w", padx=20, pady=(0, 16))
+
+        # --- Limites por categoria ---
+        limites_card = ctk.CTkFrame(inventario_frame, **ESTILO_CARD)
+        limites_card.grid(row=1, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 12))
+        criar_titulo_secao(limites_card, "Itens por categoria").pack(anchor="w", padx=20, pady=(16, 8))
+        limites_frame = ctk.CTkFrame(limites_card, fg_color="transparent")
+        limites_frame.pack(fill="x", padx=14, pady=(0, 18))
+        limites_frame.grid_columnconfigure(tuple(range(len(CATEGORIAS_ITENS))), weight=1, uniform="limites")
+        valores_limites = {}
+        for coluna, categoria in enumerate(CATEGORIAS_ITENS):
+            bloco = ctk.CTkFrame(limites_frame, **ESTILO_PAINEL)
+            bloco.grid(row=0, column=coluna, sticky="ew", padx=6)
+            ctk.CTkLabel(bloco, text=f"CATEGORIA {categoria}", font=fonte(11, "bold"), **ESTILO_ROTULO).pack(pady=(10, 0))
+            valor_limite = ctk.CTkLabel(bloco, text="", font=fonte(18, "bold"))
+            valor_limite.pack(pady=(0, 10))
+            valores_limites[categoria] = valor_limite
+
+        # --- Itens ---
+        itens_card = ctk.CTkFrame(inventario_frame, **ESTILO_CARD)
+        itens_card.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 12))
+        itens_header = ctk.CTkFrame(itens_card, fg_color="transparent")
+        itens_header.pack(fill="x", padx=20, pady=(16, 8))
+        criar_titulo_secao(itens_header, "Itens").pack(side="left")
+        ctk.CTkButton(
+            itens_header,
+            text="+  Adicionar Item",
+            font=fonte(13, "bold"),
+            command=lambda: self._abrir_editor_item(personagem, atualizar_inventario)
+        ).pack(side="right")
+
+        def filtrar(valor):
+            filtro_tipo["valor"] = valor
+            atualizar_inventario()
+
+        filtro = ctk.CTkSegmentedButton(itens_card, values=["Todos"] + TIPOS_ITENS, command=filtrar)
+        filtro.set("Todos")
+        filtro.pack(anchor="w", padx=20, pady=(0, 10))
+
+        lista_itens = ctk.CTkFrame(itens_card, fg_color="transparent")
+        lista_itens.pack(fill="x", padx=20, pady=(0, 16))
+        lista_itens.grid_columnconfigure(0, weight=1)
+
+        def remover_item(indice):
+            itens = carregar_inventario(personagem)
+            if not 0 <= indice < len(itens):
+                return
+            if not messagebox.askyesno("Remover item", f"Deseja remover '{itens[indice]['nome']}' do inventário?"):
+                return
+            itens.pop(indice)
+            salvar_inventario(personagem, itens)
+            atualizar_inventario()
+
+        def atualizar_inventario():
+            itens = carregar_inventario(personagem)
+            patente = carregar_patente(personagem)
+
+            capacidade = calcular_capacidade_carga(personagem.atributos)
+            peso_total = calcular_peso_total(itens)
+            sobrecarregado = peso_total > capacidade
+            carga_valor.configure(
+                text=f"{formatar_peso(peso_total)} / {formatar_peso(capacidade)}",
+                text_color=CORES["perigo"] if sobrecarregado else CORES["texto"]
+            )
+            carga_barra.configure(progress_color=CORES["perigo"] if sobrecarregado else CORES["destaque"])
+            carga_barra.set(min(peso_total / capacidade, 1) if capacidade else 1)
+            if sobrecarregado:
+                carga_status.configure(
+                    text=f"Sobrecarregado: {formatar_peso(peso_total - capacidade)} acima da capacidade",
+                    text_color=CORES["perigo"]
+                )
+            else:
+                carga_status.configure(
+                    text=f"Capacidade definida pela Força ({obter_forca(personagem.atributos)})",
+                    text_color=CORES["texto_suave"]
+                )
+
+            contagem = contar_itens_por_categoria(itens)
+            for categoria, valor_limite in valores_limites.items():
+                quantidade = contagem.get(categoria, 0)
+                limite = obter_limite_categoria(patente, categoria)
+                if limite is None:
+                    valor_limite.configure(text=f"{quantidade} / ∞", text_color=CORES["texto"])
+                    continue
+                if quantidade > limite:
+                    cor = CORES["perigo"]
+                elif limite == 0:
+                    cor = CORES["texto_suave"]
+                else:
+                    cor = CORES["texto"]
+                valor_limite.configure(text=f"{quantidade} / {limite}", text_color=cor)
+
+            for widget in lista_itens.winfo_children():
+                widget.destroy()
+
+            itens_visiveis = [
+                (indice, item) for indice, item in enumerate(itens)
+                if filtro_tipo["valor"] == "Todos" or item.get("tipo") == filtro_tipo["valor"]
+            ]
+            if not itens_visiveis:
+                ctk.CTkLabel(
+                    lista_itens,
+                    text="Nenhum item no inventário." if not itens else "Nenhum item deste tipo.",
+                    **ESTILO_ROTULO
+                ).grid(row=0, column=0, sticky="w", pady=8)
+                return
+
+            for linha, (indice, item) in enumerate(itens_visiveis):
+                item_frame = ctk.CTkFrame(lista_itens, **ESTILO_PAINEL)
+                item_frame.grid(row=linha, column=0, sticky="ew", pady=3)
+                item_frame.grid_columnconfigure(0, weight=1)
+
+                textos = ctk.CTkFrame(item_frame, fg_color="transparent")
+                textos.grid(row=0, column=0, sticky="w", padx=14, pady=10)
+                ctk.CTkLabel(textos, text=item["nome"], font=fonte(14, "bold"), anchor="w").pack(anchor="w")
+                chips = ctk.CTkFrame(textos, fg_color="transparent")
+                chips.pack(anchor="w", pady=(4, 0))
+                for texto_chip in (
+                    item.get("tipo", "Geral"),
+                    f"Categoria {item.get('categoria', '0')}",
+                    f"Peso {formatar_peso(item.get('peso', 0))}",
+                ):
+                    criar_chip(chips, texto_chip, fg_color=CORES["superficie"]).pack(side="left", padx=(0, 6))
+                if item.get("descricao"):
+                    ctk.CTkLabel(
+                        textos,
+                        text=item["descricao"],
+                        font=fonte(12),
+                        anchor="w",
+                        justify="left",
+                        wraplength=480,
+                        **ESTILO_ROTULO
+                    ).pack(anchor="w", pady=(6, 0))
+
+                acoes = ctk.CTkFrame(item_frame, fg_color="transparent")
+                acoes.grid(row=0, column=1, sticky="e", padx=14, pady=10)
+                ctk.CTkButton(
+                    acoes,
+                    text="Editar",
+                    width=70,
+                    command=lambda i=indice: self._abrir_editor_item(personagem, atualizar_inventario, i),
+                    **ESTILO_BOTAO_SECUNDARIO
+                ).pack(side="left", padx=(0, 6))
+                ctk.CTkButton(
+                    acoes,
+                    text="Remover",
+                    width=80,
+                    command=lambda i=indice: remover_item(i),
+                    **ESTILO_BOTAO_PERIGO_CONTORNO
+                ).pack(side="left")
+
+        atualizar_inventario()
+        return atualizar_inventario
+
+    def _abrir_editor_item(self, personagem, atualizar_inventario, indice=None):
+        itens = carregar_inventario(personagem)
+        item_atual = itens[indice] if indice is not None and 0 <= indice < len(itens) else None
+
+        janela = ctk.CTkToplevel(self)
+        janela.title("Editar Item" if item_atual else f"Adicionar Item - {personagem.nome}")
+        janela.geometry("460x540")
+        janela.minsize(400, 480)
+        janela.grab_set()
+
+        conteudo = ctk.CTkFrame(janela, fg_color="transparent")
+        conteudo.pack(fill="both", expand=True, padx=20, pady=20)
+        conteudo.grid_columnconfigure((0, 1), weight=1, uniform="item")
+
+        criar_rotulo_campo(conteudo, "Nome").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        nome_entrada = ctk.CTkEntry(conteudo, height=36, placeholder_text="Nome do item")
+        nome_entrada.grid(row=1, column=0, columnspan=2, sticky="ew")
+
+        criar_rotulo_campo(conteudo, "Tipo").grid(row=2, column=0, columnspan=2, sticky="w", pady=(14, 4))
+        tipo_menu = ctk.CTkOptionMenu(conteudo, values=TIPOS_ITENS, height=36, dynamic_resizing=False)
+        tipo_menu.grid(row=3, column=0, columnspan=2, sticky="ew")
+
+        criar_rotulo_campo(conteudo, "Categoria").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(14, 4))
+        categoria_menu = ctk.CTkOptionMenu(conteudo, values=CATEGORIAS_ITENS, height=36, dynamic_resizing=False)
+        categoria_menu.grid(row=5, column=0, sticky="ew", padx=(0, 8))
+
+        criar_rotulo_campo(conteudo, "Peso").grid(row=4, column=1, sticky="w", padx=(8, 0), pady=(14, 4))
+        peso_entrada = ctk.CTkEntry(conteudo, height=36, placeholder_text="0")
+        peso_entrada.grid(row=5, column=1, sticky="ew", padx=(8, 0))
+
+        criar_rotulo_campo(conteudo, "Descrição").grid(row=6, column=0, columnspan=2, sticky="w", pady=(14, 4))
+        descricao_entrada = ctk.CTkTextbox(conteudo, height=120, wrap="word")
+        descricao_entrada.grid(row=7, column=0, columnspan=2, sticky="nsew")
+        conteudo.grid_rowconfigure(7, weight=1)
+
+        if item_atual:
+            nome_entrada.insert(0, item_atual.get("nome", ""))
+            tipo_menu.set(item_atual.get("tipo", "Geral") if item_atual.get("tipo") in TIPOS_ITENS else "Geral")
+            categoria_menu.set(item_atual.get("categoria", "0") if item_atual.get("categoria") in CATEGORIAS_ITENS else "0")
+            peso_entrada.insert(0, formatar_peso(item_atual.get("peso", 0)))
+            descricao_entrada.insert("1.0", item_atual.get("descricao", ""))
+        else:
+            tipo_menu.set("Geral")
+            categoria_menu.set("0")
+
+        def salvar_item():
+            nome = nome_entrada.get().strip()
+            if not nome:
+                messagebox.showerror("Erro", "O nome do item é obrigatório.", parent=janela)
+                return
+
+            peso_texto = peso_entrada.get().strip().replace(",", ".") or "0"
+            try:
+                peso = float(peso_texto)
+            except ValueError:
+                peso = -1
+            if peso < 0:
+                messagebox.showerror("Erro", "O peso deve ser um número maior ou igual a zero.", parent=janela)
+                return
+
+            itens_atuais = carregar_inventario(personagem)
+            categoria = categoria_menu.get()
+            erro_limite = validar_limite_categoria(
+                itens_atuais,
+                carregar_patente(personagem),
+                categoria,
+                ignorar_indice=indice if item_atual else None,
+            )
+            if erro_limite:
+                messagebox.showerror("Limite atingido", erro_limite, parent=janela)
+                return
+
+            novo_item = {
+                "nome": nome,
+                "tipo": tipo_menu.get(),
+                "categoria": categoria,
+                "peso": int(peso) if peso.is_integer() else peso,
+                "descricao": descricao_entrada.get("1.0", "end").strip(),
+            }
+            if item_atual:
+                itens_atuais[indice] = novo_item
+            else:
+                itens_atuais.append(novo_item)
+            salvar_inventario(personagem, itens_atuais)
+            atualizar_inventario()
+            janela.destroy()
+
+        ctk.CTkButton(
+            janela,
+            text="Salvar Item",
+            height=40,
+            font=fonte(14, "bold"),
+            command=salvar_item
+        ).pack(anchor="e", padx=20, pady=(0, 20))
+        nome_entrada.focus_set()
+
     def _criar_aba_edicao(self, tabview, tab_edicao, personagem, ficha_widgets):
         valor_pv_ficha = ficha_widgets["valor_pv_ficha"]
         valor_pd_ficha = ficha_widgets["valor_pd_ficha"]
@@ -1292,6 +1615,7 @@ class GerenciadorGUI(ctk.CTk):
         valor_origem = ficha_widgets["valor_origem"]
         valores_atributos_ficha = ficha_widgets["valores_atributos_ficha"]
         historia_text = ficha_widgets["historia_text"]
+        atualizar_inventario = ficha_widgets["atualizar_inventario"]
 
         edicao_frame = ctk.CTkScrollableFrame(tab_edicao, fg_color="transparent")
         edicao_frame.pack(fill="both", expand=True, padx=4, pady=4)
@@ -1512,6 +1836,7 @@ class GerenciadorGUI(ctk.CTk):
                 historia_text.delete("1.0", "end")
                 historia_text.insert("1.0", personagem.historia)
                 historia_text.configure(state="disabled")
+                atualizar_inventario()
                 self.atualizar_lista()
                 tabview.set("Dados Gerais")
                 messagebox.showinfo("Sucesso", "Ficha atualizada com sucesso!")

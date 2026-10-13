@@ -188,3 +188,18 @@ DESCRICOES_RITUAIS = {
     "Desfazer Sinapses": TEXTO_PADRAO_DESCRICAO,
     "Coincidencia Forçada": TEXTO_PADRAO_DESCRICAO,
 }
+
+PATENTES = [
+    "Mundano",
+    "Recruta",
+    "Operador",
+    "Agente Especial",
+    "Oficial de Operações",
+    "Agente de Elite",
+]
+
+PATENTE_PADRAO = "Recruta"
+
+CATEGORIAS_ITENS = ["0", "I", "II", "III", "IV"]
+
+TIPOS_ITENS = ["Armas", "Munições", "Proteções", "Itens amaldiçoados", "Geral"]

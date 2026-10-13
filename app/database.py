@@ -56,6 +56,18 @@ def ensure_database_schema():
                 text("ALTER TABLE personagens ADD COLUMN valores_editados VARCHAR DEFAULT '{}'")
             )
 
+    if "patente" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE personagens ADD COLUMN patente VARCHAR DEFAULT 'Recruta'")
+            )
+
+    if "inventario" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE personagens ADD COLUMN inventario VARCHAR DEFAULT '[]'")
+            )
+
 
 def get_db():
     """Função utilitária para abrir e fechar a sessão do banco com segurança"""
