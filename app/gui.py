@@ -45,13 +45,110 @@ from app.pericia_storage import (
     salvar_dados_pericias,
 )
 
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
+from app.theme import (
+    CORES,
+    ESTILO_BOTAO_PERIGO,
+    ESTILO_BOTAO_PERIGO_CONTORNO,
+    ESTILO_BOTAO_SECUNDARIO,
+    ESTILO_CARD,
+    ESTILO_ITEM_LISTA,
+    ESTILO_PAINEL,
+    ESTILO_ROTULO,
+    aplicar_tema,
+    fonte,
+    iniciais,
+)
+
+aplicar_tema()
+
+
+def criar_avatar(master, nome, tamanho):
+    avatar = ctk.CTkFrame(
+        master,
+        width=tamanho,
+        height=tamanho,
+        corner_radius=tamanho // 2,
+        fg_color=CORES["destaque_suave"],
+    )
+    avatar.grid_propagate(False)
+    avatar.pack_propagate(False)
+    ctk.CTkLabel(
+        avatar,
+        text=iniciais(nome),
+        text_color=CORES["destaque"],
+        font=fonte(max(tamanho // 3, 14), "bold"),
+    ).place(relx=0.5, rely=0.5, anchor="center")
+    return avatar
+
+
+def criar_chip(master, texto):
+    return ctk.CTkLabel(
+        master,
+        text=texto,
+        fg_color=CORES["superficie_alt"],
+        text_color=CORES["texto_suave"],
+        corner_radius=8,
+        height=24,
+        font=fonte(12),
+        padx=10,
+    )
+
+
+def criar_bloco_status(master, rotulo, valor="", cor=None, destaque=True, textvariable=None):
+    bloco = ctk.CTkFrame(master, **ESTILO_PAINEL)
+    ctk.CTkLabel(bloco, text=rotulo.upper(), font=fonte(11, "bold"), **ESTILO_ROTULO).pack(
+        anchor="w", padx=12, pady=(8, 0)
+    )
+    valor_label = ctk.CTkLabel(
+        bloco,
+        text=valor,
+        textvariable=textvariable,
+        font=fonte(22 if destaque else 16, "bold"),
+        text_color=cor or CORES["texto"],
+    )
+    valor_label.pack(anchor="w", padx=12, pady=(0, 8))
+    return bloco, valor_label
+
+
+def criar_rotulo_campo(master, texto, **kwargs):
+    return ctk.CTkLabel(master, text=texto, font=fonte(12, "bold"), anchor="w", **ESTILO_ROTULO, **kwargs)
+
+
+def criar_titulo_secao(master, texto):
+    return ctk.CTkLabel(master, text=texto, font=fonte(15, "bold"), anchor="w")
+
+
+def texto_resumo_personagem(personagem):
+    origem_valor = getattr(personagem, "origem", None) or ""
+    return f"{personagem.classe}  ·  Nível {personagem.nivel}  ·  NEX {personagem.nex}%  ·  {origem_valor or 'Origem não informada'}"
+
+
+def criar_tabview(master, **kwargs):
+    # Ao trocar de aba, fecha dropdowns de Origem que ficaram abertos sobre a janela.
+    tabview = ctk.CTkTabview(
+        master,
+        fg_color=CORES["superficie"],
+        border_width=1,
+        border_color=CORES["borda"],
+        corner_radius=14,
+        command=ScrollableOriginOptionMenu.fechar_dropdowns_abertos,
+        **kwargs
+    )
+    tabview._segmented_button.configure(font=fonte(13, "bold"))
+    return tabview
+
 
 class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
+    _menus_abertos = set()
+
     def __init__(self, master, values, width=560, height=32, command=None):
         super().__init__(master, values=values, width=width, height=height, command=command, dynamic_resizing=False)
         self._dropdown_frame = None
+
+    @classmethod
+    def fechar_dropdowns_abertos(cls):
+        for menu in list(cls._menus_abertos):
+            menu._close_dropdown_menu()
 
     def _open_dropdown_menu(self):
         if self._dropdown_frame is not None:
@@ -61,21 +158,23 @@ class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
         root = self.winfo_toplevel()
         self._dropdown_frame = ctk.CTkFrame(
             root,
-            corner_radius=8,
+            corner_radius=10,
             border_width=1,
-            fg_color=("#2B2B2B", "#1F1F1F"),
-            border_color=("#4A4A4A", "#5A5A5A")
+            fg_color=CORES["superficie"],
+            border_color=CORES["borda"]
         )
 
         x = self.winfo_rootx() - root.winfo_rootx()
         y = self.winfo_rooty() - root.winfo_rooty() + self.winfo_height() + 4
         self._dropdown_frame.place(x=x, y=y)
         self._dropdown_frame.lift()
+        ScrollableOriginOptionMenu._menus_abertos.add(self)
 
         scroll_frame = ctk.CTkScrollableFrame(
             self._dropdown_frame,
             width=max(self._desired_width, 220),
-            height=180
+            height=200,
+            fg_color="transparent"
         )
         scroll_frame.pack(fill="both", expand=True, padx=6, pady=6)
 
@@ -84,13 +183,15 @@ class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
                 scroll_frame,
                 text=value,
                 width=max(self._desired_width, 220),
-                height=28,
-                fg_color="transparent",
-                hover_color=("#3A3A3A", "#4A4A4A"),
+                height=30,
+                fg_color=CORES["destaque_suave"] if value == self._current_value else "transparent",
+                hover_color=CORES["item_hover"],
+                text_color=CORES["texto"],
+                corner_radius=6,
                 anchor="w",
                 command=lambda v=value: self._select_value(v)
             )
-            button.pack(fill="x", padx=2, pady=2)
+            button.pack(fill="x", padx=2, pady=1)
 
     def _select_value(self, value):
         self._current_value = value
@@ -107,20 +208,41 @@ class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
         self._close_dropdown_menu()
 
     def _close_dropdown_menu(self):
+        ScrollableOriginOptionMenu._menus_abertos.discard(self)
         if self._dropdown_frame is not None:
-            self._dropdown_frame.destroy()
+            if self._dropdown_frame.winfo_exists():
+                self._dropdown_frame.destroy()
             self._dropdown_frame = None
 
 class GerenciadorGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Gerenciador de Inventário RPG")
-        self.geometry("960x720")
+        self.geometry("1040x780")
         self.minsize(800, 600)
 
+        cabecalho = ctk.CTkFrame(self, fg_color="transparent")
+        cabecalho.pack(fill="x", padx=28, pady=(22, 0))
+        marca = ctk.CTkFrame(cabecalho, width=40, height=40, corner_radius=12, fg_color=CORES["destaque"])
+        marca.pack(side="left", padx=(0, 14))
+        marca.pack_propagate(False)
+        ctk.CTkLabel(marca, text="◈", font=fonte(20, "bold"), text_color=CORES["texto_claro"]).place(
+            relx=0.5, rely=0.5, anchor="center"
+        )
+        titulos = ctk.CTkFrame(cabecalho, fg_color="transparent")
+        titulos.pack(side="left")
+        ctk.CTkLabel(titulos, text="Gerenciador de Inventário RPG", font=fonte(20, "bold"), anchor="w").pack(anchor="w")
+        ctk.CTkLabel(
+            titulos,
+            text="Crie, consulte e edite as fichas dos seus personagens",
+            font=fonte(12),
+            anchor="w",
+            **ESTILO_ROTULO
+        ).pack(anchor="w")
+
         # Criar abas
-        self.notebook = ctk.CTkTabview(self, width=900, height=640)
-        self.notebook.pack(padx=20, pady=20, fill="both", expand=True)
+        self.notebook = criar_tabview(self, width=900, height=640)
+        self.notebook.pack(padx=20, pady=(8, 20), fill="both", expand=True)
 
         self.notebook.add("Criar Personagem")
         self.notebook.add("Listar Personagens")
@@ -135,115 +257,133 @@ class GerenciadorGUI(ctk.CTk):
         self.trilhas_por_classe = TRILHAS_POR_CLASSE
 
         self.entradas = {}
-        row = 0
 
-        ctk.CTkLabel(self.frame_criar, text="Nome:").grid(row=row, column=0, sticky="w", padx=10, pady=10)
-        nome_entrada = ctk.CTkEntry(self.frame_criar, width=560)
-        nome_entrada.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        formulario = ctk.CTkScrollableFrame(self.frame_criar, fg_color="transparent")
+        formulario.pack(fill="both", expand=True, padx=4, pady=4)
+        formulario.grid_columnconfigure(0, weight=1)
+
+        # --- Identidade ---
+        card_identidade = ctk.CTkFrame(formulario, **ESTILO_CARD)
+        card_identidade.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 12))
+        card_identidade.grid_columnconfigure((0, 1), weight=1, uniform="identidade")
+        criar_titulo_secao(card_identidade, "Identidade").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=20, pady=(16, 4)
+        )
+
+        criar_rotulo_campo(card_identidade, "Nome").grid(row=1, column=0, columnspan=2, sticky="w", padx=20, pady=(8, 4))
+        nome_entrada = ctk.CTkEntry(card_identidade, width=560, height=36, placeholder_text="Nome do personagem")
+        nome_entrada.grid(row=2, column=0, columnspan=2, sticky="ew", padx=20)
         self.entradas["nome"] = nome_entrada
-        row += 1
 
-        ctk.CTkLabel(self.frame_criar, text="Classe:").grid(row=row, column=0, sticky="w", padx=10, pady=10)
+        criar_rotulo_campo(card_identidade, "Classe").grid(row=3, column=0, sticky="w", padx=(20, 8), pady=(14, 4))
         classe_entrada = ctk.CTkOptionMenu(
-            self.frame_criar,
+            card_identidade,
             values=CLASSES,
-            width=560,
+            width=260,
+            height=36,
             command=self.atualizar_trilha_opcoes
         )
         classe_entrada.set("Combatente")
-        classe_entrada.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        classe_entrada.grid(row=4, column=0, sticky="ew", padx=(20, 8))
         self.entradas["classe"] = classe_entrada
-        row += 1
 
-        self.nivel_label = ctk.CTkLabel(self.frame_criar, text="Nível:")
-        self.nivel_label.grid(row=row, column=0, sticky="w", padx=10, pady=10)
-        nivel_entrada = ctk.CTkEntry(self.frame_criar, width=90)
-        nivel_entrada.grid(row=row, column=1, sticky="w", padx=10, pady=(8, 0))
+        self.nivel_label = criar_rotulo_campo(card_identidade, "Nível")
+        self.nivel_label.grid(row=5, column=0, sticky="w", padx=(20, 8), pady=(14, 4))
+        nivel_entrada = ctk.CTkEntry(card_identidade, width=260, height=36, placeholder_text="1")
+        nivel_entrada.grid(row=6, column=0, sticky="ew", padx=(20, 8))
         self.entradas["nivel"] = nivel_entrada
 
-        ctk.CTkLabel(self.frame_criar, text="NEX:").grid(row=row, column=2, sticky="w", padx=10, pady=10)
-        nex_entrada = ctk.CTkEntry(self.frame_criar, width=90)
-        nex_entrada.grid(row=row, column=3, sticky="w", padx=10, pady=(8, 0))
+        criar_rotulo_campo(card_identidade, "NEX (%)").grid(row=5, column=1, sticky="w", padx=(8, 20), pady=(14, 4))
+        nex_entrada = ctk.CTkEntry(card_identidade, width=260, height=36, placeholder_text="0")
+        nex_entrada.grid(row=6, column=1, sticky="ew", padx=(8, 20))
         self.entradas["nex"] = nex_entrada
-        row += 1
 
         self.nivel_erro_label = ctk.CTkLabel(
-            self.frame_criar,
+            card_identidade,
             text="",
-            text_color="red",
+            text_color=CORES["perigo"],
             anchor="w",
             height=18,
-            font=ctk.CTkFont(size=12)
+            font=fonte(12)
         )
-        self.nivel_erro_label.grid(row=row, column=1, sticky="w", padx=10, pady=(0, 0))
+        self.nivel_erro_label.grid(row=7, column=0, sticky="w", padx=(20, 8), pady=(2, 0))
         nivel_entrada.bind("<KeyRelease>", self.validar_nivel)
         nivel_entrada.bind("<FocusOut>", self.validar_nivel)
 
         self.nex_erro_label = ctk.CTkLabel(
-            self.frame_criar,
+            card_identidade,
             text="",
-            text_color="red",
+            text_color=CORES["perigo"],
             anchor="w",
             height=18,
-            font=ctk.CTkFont(size=12)
+            font=fonte(12)
         )
-        self.nex_erro_label.grid(row=row, column=3, sticky="w", padx=10, pady=(0, 0))
+        self.nex_erro_label.grid(row=7, column=1, sticky="w", padx=(8, 20), pady=(2, 0))
         nex_entrada.bind("<KeyRelease>", self.validar_nex)
         nex_entrada.bind("<FocusOut>", self.validar_nex)
-        row += 1
 
-        ctk.CTkLabel(self.frame_criar, text="Trilha:").grid(row=row, column=0, sticky="w", padx=10, pady=10)
+        criar_rotulo_campo(card_identidade, "Trilha").grid(row=3, column=1, sticky="w", padx=(8, 20), pady=(14, 4))
         trilha_entrada = ctk.CTkOptionMenu(
-            self.frame_criar,
+            card_identidade,
             values=self.trilhas_por_classe["Combatente"],
-            width=560
+            width=260,
+            height=36
         )
         trilha_entrada.set(self.trilhas_por_classe["Combatente"][0])
-        trilha_entrada.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        trilha_entrada.grid(row=4, column=1, sticky="ew", padx=(8, 20))
         self.entradas["trilha"] = trilha_entrada
         self.atualizar_estado_trilha()
-        row += 1
 
-        ctk.CTkLabel(self.frame_criar, text="Origem:").grid(row=row, column=0, sticky="w", padx=10, pady=10)
+        criar_rotulo_campo(card_identidade, "Origem").grid(row=8, column=0, columnspan=2, sticky="w", padx=20, pady=(8, 4))
         origem_entrada = ScrollableOriginOptionMenu(
-            self.frame_criar,
+            card_identidade,
             values=ORIGENS,
             width=560,
-            height=32
+            height=36
         )
         origem_entrada.set(ORIGENS[0])
-        origem_entrada.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        origem_entrada.grid(row=9, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 20))
         self.entradas["origem"] = origem_entrada
-        row += 1
 
-        atributos_label = ctk.CTkLabel(self.frame_criar, text="Atributos:")
-        atributos_label.grid(row=row, column=0, sticky="nw", padx=10, pady=10)
+        # --- Atributos ---
+        card_atributos = ctk.CTkFrame(formulario, **ESTILO_CARD)
+        card_atributos.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 12))
+        criar_titulo_secao(card_atributos, "Atributos").pack(anchor="w", padx=20, pady=(16, 8))
 
-        atributos_frame = ctk.CTkFrame(self.frame_criar)
-        atributos_frame.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        atributos_frame = ctk.CTkFrame(card_atributos, fg_color="transparent")
+        atributos_frame.pack(fill="x", padx=14, pady=(0, 18))
 
         for col, (texto, chave_attr) in enumerate(ATRIBUTOS):
-            ctk.CTkLabel(atributos_frame, text=texto).grid(row=0, column=col, sticky="w", padx=5, pady=(0, 5))
-            entrada_attr = ctk.CTkEntry(atributos_frame, width=100)
-            entrada_attr.grid(row=1, column=col, sticky="ew", padx=5, pady=5)
+            bloco = ctk.CTkFrame(atributos_frame, **ESTILO_PAINEL)
+            bloco.grid(row=0, column=col, sticky="ew", padx=6)
+            ctk.CTkLabel(bloco, text=texto.upper(), font=fonte(11, "bold"), **ESTILO_ROTULO).pack(pady=(10, 4))
+            entrada_attr = ctk.CTkEntry(
+                bloco,
+                width=100,
+                height=40,
+                justify="center",
+                font=fonte(18, "bold")
+            )
+            entrada_attr.pack(fill="x", padx=12, pady=(0, 12))
             entrada_attr.insert(0, "1")
             self.entradas[chave_attr] = entrada_attr
-            atributos_frame.columnconfigure(col, weight=1)
+            atributos_frame.columnconfigure(col, weight=1, uniform="atributos")
 
-        row += 1
-
-        ctk.CTkLabel(self.frame_criar, text="História:").grid(row=row, column=0, sticky="nw", padx=10, pady=10)
-        historia_entrada = ctk.CTkTextbox(self.frame_criar, width=560, height=140)
-        historia_entrada.grid(row=row, column=1, columnspan=3, sticky="ew", padx=10, pady=10)
+        # --- História ---
+        card_historia = ctk.CTkFrame(formulario, **ESTILO_CARD)
+        card_historia.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 12))
+        criar_titulo_secao(card_historia, "História").pack(anchor="w", padx=20, pady=(16, 8))
+        historia_entrada = ctk.CTkTextbox(card_historia, width=560, height=140, wrap="word")
+        historia_entrada.pack(fill="x", padx=20, pady=(0, 20))
         self.entradas["historia"] = historia_entrada
-        row += 1
 
-        self.frame_criar.columnconfigure(1, weight=1)
-        self.frame_criar.columnconfigure(3, weight=1)
-
-        ctk.CTkButton(self.frame_criar, text="Salvar Personagem", command=self.salvar_personagem).grid(
-            row=row, column=3, sticky="e", padx=10, pady=20
-        )
+        ctk.CTkButton(
+            formulario,
+            text="Salvar Personagem",
+            command=self.salvar_personagem,
+            height=40,
+            font=fonte(14, "bold")
+        ).grid(row=3, column=0, sticky="e", padx=6, pady=(4, 16))
 
     def validar_nivel(self, event=None):
         nivel_texto = self.entradas["nivel"].get().strip()
@@ -291,7 +431,7 @@ class GerenciadorGUI(ctk.CTk):
         if trilha_menu is None:
             return
 
-        self.nivel_label.configure(text="Estágio:" if classe_selecionada == "Sobrevivente" else "Nível:")
+        self.nivel_label.configure(text="Estágio" if classe_selecionada == "Sobrevivente" else "Nível")
         nivel_texto = self.entradas["nivel"].get().strip()
         limite_inferior, limite_superior = obter_limites_nivel(classe_selecionada)
         if ajustar_nivel and (not nivel_texto.isdigit() or not limite_inferior <= int(nivel_texto) <= limite_superior):
@@ -324,13 +464,20 @@ class GerenciadorGUI(ctk.CTk):
         self.atualizar_trilha_opcoes(classe_selecionada, ajustar_nivel=False)
 
     def criar_aba_listar(self):
-        button_frame = ctk.CTkFrame(self.frame_listar)
+        button_frame = ctk.CTkFrame(self.frame_listar, fg_color="transparent")
         button_frame.pack(fill="x", padx=10, pady=(10, 0))
 
-        ctk.CTkButton(button_frame, text="Atualizar Lista", command=self.atualizar_lista).pack(side="left", padx=(0, 10))
+        criar_titulo_secao(button_frame, "Seus personagens").pack(side="left")
+        ctk.CTkButton(
+            button_frame,
+            text="⟳  Atualizar Lista",
+            command=self.atualizar_lista,
+            width=150,
+            **ESTILO_BOTAO_SECUNDARIO
+        ).pack(side="right")
 
-        self.lista_scroll = ctk.CTkScrollableFrame(self.frame_listar, width=900, height=520)
-        self.lista_scroll.pack(fill="both", expand=True, padx=10, pady=10)
+        self.lista_scroll = ctk.CTkScrollableFrame(self.frame_listar, width=900, height=520, fg_color="transparent")
+        self.lista_scroll.pack(fill="both", expand=True, padx=4, pady=10)
 
         self.atualizar_lista()
 
@@ -448,26 +595,28 @@ class GerenciadorGUI(ctk.CTk):
     def abrir_ficha(self, personagem):
         ficha = ctk.CTkToplevel(self)
         ficha.title(f"Ficha de {personagem.nome}")
-        ficha.geometry("620x620")
+        ficha.geometry("820x760")
+        ficha.minsize(680, 560)
         ficha.grab_set()
 
-        header_frame = ctk.CTkFrame(ficha)
-        header_frame.pack(fill="x", padx=20, pady=(20, 10))
+        header_frame = ctk.CTkFrame(ficha, **ESTILO_CARD)
+        header_frame.pack(fill="x", padx=20, pady=(20, 12))
+        header_frame.grid_columnconfigure(1, weight=1)
 
-        photo_frame = ctk.CTkFrame(header_frame, width=140, height=140, corner_radius=20)
-        photo_frame.grid(row=0, column=0, rowspan=2, padx=(0, 15), pady=0)
-        photo_frame.grid_propagate(False)
-        ctk.CTkLabel(photo_frame, text="Foto", font=ctk.CTkFont(size=18, weight="bold")).place(relx=0.5, rely=0.5, anchor="center")
+        criar_avatar(header_frame, personagem.nome, 84).grid(row=0, column=0, rowspan=2, padx=(20, 16), pady=18)
 
-        ctk.CTkLabel(header_frame, text=personagem.nome, font=ctk.CTkFont(size=24, weight="bold")).grid(row=0, column=1, sticky="w")
-        origem_valor = getattr(personagem, "origem", None) or ""
+        ctk.CTkLabel(header_frame, text=personagem.nome, font=fonte(24, "bold"), anchor="w").grid(
+            row=0, column=1, sticky="sw", pady=(18, 0)
+        )
         resumo_ficha = ctk.CTkLabel(
             header_frame,
-            text=f"Classe: {personagem.classe} | Nível: {personagem.nivel} | NEX: {personagem.nex}% | Origem: {origem_valor or 'Não informada'}"
+            text=texto_resumo_personagem(personagem),
+            anchor="w",
+            **ESTILO_ROTULO
         )
-        resumo_ficha.grid(row=1, column=1, sticky="w")
+        resumo_ficha.grid(row=1, column=1, sticky="nw", pady=(2, 18))
 
-        tabview = ctk.CTkTabview(ficha)
+        tabview = criar_tabview(ficha)
         tabview.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
         tab_dados = tabview.add("Dados Gerais")
@@ -477,28 +626,31 @@ class GerenciadorGUI(ctk.CTk):
         tab_inventario = tabview.add("Inventário")
 
         habilidades_header = ctk.CTkFrame(tab_habilidades, fg_color="transparent")
-        habilidades_header.pack(fill="x", padx=20, pady=20)
+        habilidades_header.pack(fill="x", padx=12, pady=(12, 12))
         ctk.CTkButton(
             habilidades_header,
-            text="Adicionar Habilidade",
+            text="+  Adicionar Habilidade",
+            font=fonte(13, "bold"),
             command=lambda: self._abrir_seletor_habilidades(personagem, atualizar_habilidades)
         ).pack(side="left")
 
         habilidades_conteudo = ctk.CTkFrame(tab_habilidades, fg_color="transparent")
-        habilidades_conteudo.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        habilidades_conteudo.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         habilidades_conteudo.grid_columnconfigure(0, weight=1)
         habilidades_conteudo.grid_columnconfigure(1, weight=2)
         habilidades_conteudo.grid_rowconfigure(0, weight=1)
 
-        habilidades_frame = ctk.CTkScrollableFrame(habilidades_conteudo)
+        habilidades_frame = ctk.CTkScrollableFrame(habilidades_conteudo, **ESTILO_PAINEL)
         habilidades_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        habilidade_detalhes = ctk.CTkFrame(habilidades_conteudo)
+        habilidade_detalhes = ctk.CTkFrame(habilidades_conteudo, **ESTILO_PAINEL)
         habilidade_detalhes.grid(row=0, column=1, sticky="nsew")
         habilidade_titulo = ctk.CTkLabel(
             habilidade_detalhes,
             text="Selecione uma habilidade",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            font=fonte(19, "bold"),
+            anchor="w",
+            justify="left",
             wraplength=260
         )
         habilidade_titulo.pack(anchor="nw", padx=20, pady=(20, 12))
@@ -515,16 +667,14 @@ class GerenciadorGUI(ctk.CTk):
             habilidade_detalhes,
             text="Editar Descrição",
             command=lambda: abrir_editor_descricao_habilidade(),
-            fg_color="#3B8ED0",
-            hover_color="#2C6EAF"
+            **ESTILO_BOTAO_SECUNDARIO
         )
         botao_editar_descricao_habilidade.pack_forget()
         botao_remover_habilidade = ctk.CTkButton(
             habilidade_detalhes,
             text="Remover Habilidade",
             command=lambda: remover_habilidade_selecionada(),
-            fg_color="#B22222",
-            hover_color="#8B0000",
+            **ESTILO_BOTAO_PERIGO_CONTORNO,
             state="normal"
         )
         botao_remover_habilidade.pack_forget()
@@ -540,11 +690,11 @@ class GerenciadorGUI(ctk.CTk):
 
             editor = ctk.CTkToplevel(self)
             editor.title(f"Editar descrição - {nome_habilidade}")
-            editor.geometry("420x260")
+            editor.geometry("480x320")
             editor.grab_set()
 
-            ctk.CTkLabel(editor, text=f"Descrição de {nome_habilidade}:", anchor="w").pack(fill="x", padx=20, pady=(20, 10))
-            campo = ctk.CTkTextbox(editor, height=140)
+            ctk.CTkLabel(editor, text=f"Descrição de {nome_habilidade}", font=fonte(15, "bold"), anchor="w").pack(fill="x", padx=20, pady=(20, 10))
+            campo = ctk.CTkTextbox(editor, height=140, wrap="word")
             campo.pack(fill="both", expand=True, padx=20, pady=(0, 10))
             campo.insert("1.0", descricao_atual)
 
@@ -554,7 +704,7 @@ class GerenciadorGUI(ctk.CTk):
                 habilidade_descricao.configure(text=texto or TEXTO_PADRAO_DESCRICAO)
                 editor.destroy()
 
-            ctk.CTkButton(editor, text="Salvar", command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
+            ctk.CTkButton(editor, text="Salvar", font=fonte(13, "bold"), command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
 
         def remover_habilidade_selecionada():
             nome_habilidade = habilidade_selecionada["nome"]
@@ -577,7 +727,8 @@ class GerenciadorGUI(ctk.CTk):
             if not habilidades:
                 ctk.CTkLabel(
                     habilidades_frame,
-                    text="Nenhuma habilidade adicionada."
+                    text="Nenhuma habilidade adicionada.",
+                    **ESTILO_ROTULO
                 ).pack(anchor="w", padx=10, pady=10)
                 limpar_selecao_habilidade()
                 return
@@ -587,10 +738,9 @@ class GerenciadorGUI(ctk.CTk):
                     habilidades_frame,
                     text=habilidade,
                     anchor="w",
-                    fg_color="transparent",
-                    hover_color=("#D9D9D9", "#3A3A3A"),
+                    **ESTILO_ITEM_LISTA,
                     command=lambda nome=habilidade: exibir_habilidade(nome)
-                ).pack(fill="x", padx=10, pady=6)
+                ).pack(fill="x", padx=4, pady=1)
 
         def exibir_habilidade(habilidade):
             habilidade_selecionada["nome"] = habilidade
@@ -601,7 +751,7 @@ class GerenciadorGUI(ctk.CTk):
             )
             botao_editar_descricao_habilidade.configure(state="normal")
             botao_remover_habilidade.configure(state="normal")
-            botao_editar_descricao_habilidade.pack(anchor="w", padx=20, pady=(0, 20))
+            botao_editar_descricao_habilidade.pack(anchor="w", padx=20, pady=(0, 8))
             botao_remover_habilidade.pack(anchor="w", padx=20, pady=(0, 20))
 
         def limpar_selecao_habilidade():
@@ -617,28 +767,31 @@ class GerenciadorGUI(ctk.CTk):
         atualizar_habilidades()
 
         rituais_header = ctk.CTkFrame(tab_rituais, fg_color="transparent")
-        rituais_header.pack(fill="x", padx=20, pady=20)
+        rituais_header.pack(fill="x", padx=12, pady=(12, 12))
         ctk.CTkButton(
             rituais_header,
-            text="Adicionar Ritual",
+            text="+  Adicionar Ritual",
+            font=fonte(13, "bold"),
             command=lambda: self._abrir_seletor_rituais(personagem, atualizar_rituais)
         ).pack(side="left")
 
         rituais_conteudo = ctk.CTkFrame(tab_rituais, fg_color="transparent")
-        rituais_conteudo.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        rituais_conteudo.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         rituais_conteudo.grid_columnconfigure(0, weight=1)
         rituais_conteudo.grid_columnconfigure(1, weight=2)
         rituais_conteudo.grid_rowconfigure(0, weight=1)
 
-        rituais_frame = ctk.CTkScrollableFrame(rituais_conteudo)
+        rituais_frame = ctk.CTkScrollableFrame(rituais_conteudo, **ESTILO_PAINEL)
         rituais_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        ritual_detalhes = ctk.CTkFrame(rituais_conteudo)
+        ritual_detalhes = ctk.CTkFrame(rituais_conteudo, **ESTILO_PAINEL)
         ritual_detalhes.grid(row=0, column=1, sticky="nsew")
         ritual_titulo = ctk.CTkLabel(
             ritual_detalhes,
             text="Selecione um ritual",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            font=fonte(19, "bold"),
+            anchor="w",
+            justify="left",
             wraplength=260
         )
         ritual_titulo.pack(anchor="nw", padx=20, pady=(20, 12))
@@ -655,16 +808,14 @@ class GerenciadorGUI(ctk.CTk):
             ritual_detalhes,
             text="Editar Descrição",
             command=lambda: abrir_editor_descricao_ritual(),
-            fg_color="#3B8ED0",
-            hover_color="#2C6EAF"
+            **ESTILO_BOTAO_SECUNDARIO
         )
         botao_editar_descricao_ritual.pack_forget()
         botao_remover_ritual = ctk.CTkButton(
             ritual_detalhes,
             text="Remover Ritual",
             command=lambda: remover_ritual_selecionado(),
-            fg_color="#B22222",
-            hover_color="#8B0000"
+            **ESTILO_BOTAO_PERIGO_CONTORNO
         )
         botao_remover_ritual.pack_forget()
 
@@ -679,11 +830,11 @@ class GerenciadorGUI(ctk.CTk):
 
             editor = ctk.CTkToplevel(self)
             editor.title(f"Editar descrição - {nome_ritual}")
-            editor.geometry("420x260")
+            editor.geometry("480x320")
             editor.grab_set()
 
-            ctk.CTkLabel(editor, text=f"Descrição de {nome_ritual}:", anchor="w").pack(fill="x", padx=20, pady=(20, 10))
-            campo = ctk.CTkTextbox(editor, height=140)
+            ctk.CTkLabel(editor, text=f"Descrição de {nome_ritual}", font=fonte(15, "bold"), anchor="w").pack(fill="x", padx=20, pady=(20, 10))
+            campo = ctk.CTkTextbox(editor, height=140, wrap="word")
             campo.pack(fill="both", expand=True, padx=20, pady=(0, 10))
             campo.insert("1.0", descricao_atual)
 
@@ -693,7 +844,7 @@ class GerenciadorGUI(ctk.CTk):
                 ritual_descricao.configure(text=texto or TEXTO_PADRAO_DESCRICAO)
                 editor.destroy()
 
-            ctk.CTkButton(editor, text="Salvar", command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
+            ctk.CTkButton(editor, text="Salvar", font=fonte(13, "bold"), command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
 
         def limpar_selecao_ritual():
             ritual_selecionado["nome"] = None
@@ -727,7 +878,8 @@ class GerenciadorGUI(ctk.CTk):
             if not rituais:
                 ctk.CTkLabel(
                     rituais_frame,
-                    text="Nenhum ritual adicionado."
+                    text="Nenhum ritual adicionado.",
+                    **ESTILO_ROTULO
                 ).pack(anchor="w", padx=10, pady=10)
                 limpar_selecao_ritual()
                 return
@@ -738,10 +890,9 @@ class GerenciadorGUI(ctk.CTk):
                     rituais_frame,
                     text=nome_ritual,
                     anchor="w",
-                    fg_color="transparent",
-                    hover_color=("#D9D9D9", "#3A3A3A"),
+                    **ESTILO_ITEM_LISTA,
                     command=lambda nome=nome_ritual: exibir_ritual(nome)
-                ).pack(fill="x", padx=10, pady=6)
+                ).pack(fill="x", padx=4, pady=1)
 
         def exibir_ritual(ritual):
             ritual_selecionado["nome"] = ritual
@@ -752,84 +903,74 @@ class GerenciadorGUI(ctk.CTk):
             )
             botao_editar_descricao_ritual.configure(state="normal")
             botao_remover_ritual.configure(state="normal")
-            botao_editar_descricao_ritual.pack(anchor="w", padx=20, pady=(0, 20))
+            botao_editar_descricao_ritual.pack(anchor="w", padx=20, pady=(0, 8))
             botao_remover_ritual.pack(anchor="w", padx=20, pady=(0, 20))
 
         botao_editar_descricao_ritual.configure(state="disabled")
         botao_remover_ritual.configure(state="disabled")
         atualizar_rituais()
 
-        info_frame = ctk.CTkFrame(tab_dados)
-        info_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
-        info_frame.grid_columnconfigure(0, weight=0)
-        info_frame.grid_columnconfigure(1, weight=1)
+        info_frame = ctk.CTkScrollableFrame(tab_dados, fg_color="transparent")
+        info_frame.pack(fill="both", expand=True, padx=4, pady=(0, 4))
+        info_frame.grid_columnconfigure(0, weight=1)
 
         dados_pericias_iniciais = self._carregar_dados_pericias(personagem)
         recursos_iniciais = calcular_recursos(personagem, dados_pericias_iniciais)
-        esquiva_var = StringVar(value=f"Esquiva: {recursos_iniciais['esquiva']}")
-        bloqueio_var = StringVar(value=f"Bloqueio: {recursos_iniciais['bloqueio']}")
-        recursos_frame_ficha = ctk.CTkFrame(info_frame)
-        recursos_frame_ficha.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
-        recursos_frame_ficha.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        valor_pv_ficha = ctk.CTkLabel(recursos_frame_ficha, text=f"PV: {recursos_iniciais['pv']}", font=ctk.CTkFont(size=16, weight="bold"))
-        valor_pv_ficha.grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        valor_pd_ficha = ctk.CTkLabel(recursos_frame_ficha, text=f"PD: {recursos_iniciais['pd']}", font=ctk.CTkFont(size=16, weight="bold"))
-        valor_pd_ficha.grid(row=0, column=1, sticky="w", padx=10, pady=8)
-        pd_turno_ficha = ctk.CTkLabel(
+        esquiva_var = StringVar(value=str(recursos_iniciais['esquiva']))
+        bloqueio_var = StringVar(value=str(recursos_iniciais['bloqueio']))
+        recursos_frame_ficha = ctk.CTkFrame(info_frame, fg_color="transparent")
+        recursos_frame_ficha.grid(row=0, column=0, sticky="ew", padx=4, pady=(8, 12))
+        recursos_frame_ficha.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="recursos")
+
+        def posicionar_bloco(bloco, linha, coluna):
+            bloco.grid(row=linha, column=coluna, sticky="ew", padx=4, pady=4)
+
+        bloco, valor_pv_ficha = criar_bloco_status(recursos_frame_ficha, "PV", str(recursos_iniciais['pv']), CORES["vida"])
+        posicionar_bloco(bloco, 0, 0)
+        bloco, valor_pd_ficha = criar_bloco_status(recursos_frame_ficha, "PD", str(recursos_iniciais['pd']), CORES["esforco"])
+        posicionar_bloco(bloco, 0, 1)
+        bloco, pd_turno_ficha = criar_bloco_status(recursos_frame_ficha, "PD/Turno", str(recursos_iniciais['pd_turno']))
+        posicionar_bloco(bloco, 0, 2)
+        bloco, valor_defesa_ficha = criar_bloco_status(recursos_frame_ficha, "Defesa", str(recursos_iniciais['defesa']))
+        posicionar_bloco(bloco, 0, 3)
+        bloco, _ = criar_bloco_status(recursos_frame_ficha, "Esquiva", textvariable=esquiva_var, destaque=False)
+        posicionar_bloco(bloco, 1, 0)
+        bloco, _ = criar_bloco_status(recursos_frame_ficha, "Bloqueio", textvariable=bloqueio_var, destaque=False)
+        posicionar_bloco(bloco, 1, 1)
+        bloco, valor_deslocamento_ficha = criar_bloco_status(
             recursos_frame_ficha,
-            text=f"PD/Turno: {recursos_iniciais['pd_turno']}",
-            font=ctk.CTkFont(size=12)
+            "Deslocamento",
+            getattr(personagem, 'deslocamento', None) or '9m/6q',
+            destaque=False
         )
-        pd_turno_ficha.grid(row=1, column=1, sticky="w", padx=10, pady=(0, 8))
-        valor_defesa_ficha = ctk.CTkLabel(recursos_frame_ficha, text=f"Defesa: {recursos_iniciais['defesa']}", font=ctk.CTkFont(size=16, weight="bold"))
-        valor_defesa_ficha.grid(row=0, column=2, sticky="w", padx=10, pady=8)
-        valor_deslocamento_ficha = ctk.CTkLabel(
-            recursos_frame_ficha,
-            text=f"Deslocamento: {getattr(personagem, 'deslocamento', None) or '9m/6q'}",
-            font=ctk.CTkFont(size=12)
-        )
-        valor_deslocamento_ficha.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
-        ctk.CTkLabel(
-            recursos_frame_ficha,
-            textvariable=bloqueio_var,
-            font=ctk.CTkFont(size=12)
-        ).grid(row=1, column=3, sticky="w", padx=10, pady=(0, 8))
-        ctk.CTkLabel(
-            recursos_frame_ficha,
-            textvariable=esquiva_var,
-            font=ctk.CTkFont(size=12)
-        ).grid(row=1, column=2, sticky="w", padx=10, pady=(0, 8))
+        posicionar_bloco(bloco, 1, 2)
 
-        label_classe = ctk.CTkLabel(info_frame, text="Classe:", anchor="w")
-        valor_classe = ctk.CTkLabel(info_frame, text=personagem.classe, anchor="e")
-        label_classe.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
-        valor_classe.grid(row=1, column=1, sticky="e", padx=10, pady=(0, 8))
+        detalhes_card = ctk.CTkFrame(info_frame, **ESTILO_CARD)
+        detalhes_card.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 12))
+        detalhes_card.grid_columnconfigure(1, weight=1)
+        criar_titulo_secao(detalhes_card, "Detalhes").grid(row=0, column=0, columnspan=2, sticky="w", padx=20, pady=(16, 6))
 
-        label_nivel = ctk.CTkLabel(info_frame, text="Nível:", anchor="w")
-        valor_nivel = ctk.CTkLabel(info_frame, text=str(personagem.nivel), anchor="e")
-        label_nivel.grid(row=2, column=0, sticky="w", padx=10, pady=(0, 8))
-        valor_nivel.grid(row=2, column=1, sticky="e", padx=10, pady=(0, 8))
+        def criar_linha_detalhe(linha, rotulo, valor):
+            ultima = linha == 5
+            criar_rotulo_campo(detalhes_card, rotulo).grid(
+                row=linha, column=0, sticky="w", padx=20, pady=(4, 16 if ultima else 4)
+            )
+            valor_label = ctk.CTkLabel(detalhes_card, text=valor, anchor="e", font=fonte(13, "bold"))
+            valor_label.grid(row=linha, column=1, sticky="e", padx=20, pady=(4, 16 if ultima else 4))
+            return valor_label
 
-        label_nex = ctk.CTkLabel(info_frame, text="NEX:", anchor="w")
-        valor_nex = ctk.CTkLabel(info_frame, text=f"{personagem.nex}%", anchor="e")
-        label_nex.grid(row=3, column=0, sticky="w", padx=10, pady=(0, 8))
-        valor_nex.grid(row=3, column=1, sticky="e", padx=10, pady=(0, 8))
+        valor_classe = criar_linha_detalhe(1, "Classe", personagem.classe)
+        valor_nivel = criar_linha_detalhe(2, "Nível", str(personagem.nivel))
+        valor_nex = criar_linha_detalhe(3, "NEX", f"{personagem.nex}%")
+        valor_trilha = criar_linha_detalhe(4, "Trilha", personagem.trilha)
+        valor_origem = criar_linha_detalhe(5, "Origem", getattr(personagem, "origem", None) or "Não informada")
 
-        label_trilha = ctk.CTkLabel(info_frame, text="Trilha:", anchor="w")
-        valor_trilha = ctk.CTkLabel(info_frame, text=personagem.trilha, anchor="e")
-        label_trilha.grid(row=4, column=0, sticky="w", padx=10, pady=(0, 8))
-        valor_trilha.grid(row=4, column=1, sticky="e", padx=10, pady=(0, 8))
-
-        label_origem = ctk.CTkLabel(info_frame, text="Origem:", anchor="w")
-        valor_origem = ctk.CTkLabel(info_frame, text=getattr(personagem, "origem", None) or "Não informada", anchor="e")
-        label_origem.grid(row=5, column=0, sticky="w", padx=10, pady=(0, 8))
-        valor_origem.grid(row=5, column=1, sticky="e", padx=10, pady=(0, 8))
-
-        label_atributos = ctk.CTkLabel(info_frame, text="Atributos:", anchor="w")
-        label_atributos.grid(row=6, column=0, sticky="nw", padx=10, pady=(0, 8))
-        atributos_frame_ficha = ctk.CTkFrame(info_frame)
-        atributos_frame_ficha.grid(row=6, column=1, sticky="ew", padx=10, pady=(0, 8))
-        atributos_frame_ficha.grid_columnconfigure(tuple(range(5)), weight=1)
+        atributos_card = ctk.CTkFrame(info_frame, **ESTILO_CARD)
+        atributos_card.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 12))
+        criar_titulo_secao(atributos_card, "Atributos").pack(anchor="w", padx=20, pady=(16, 8))
+        atributos_frame_ficha = ctk.CTkFrame(atributos_card, fg_color="transparent")
+        atributos_frame_ficha.pack(fill="x", padx=14, pady=(0, 18))
+        atributos_frame_ficha.grid_columnconfigure(tuple(range(5)), weight=1, uniform="atributos")
 
         atributos_nomes_ficha = [nome for nome, _ in ATRIBUTOS]
         atributos_salvos_ficha = {}
@@ -840,23 +981,27 @@ class GerenciadorGUI(ctk.CTk):
 
         valores_atributos_ficha = {}
         for coluna, nome_atributo in enumerate(atributos_nomes_ficha):
+            bloco_atributo = ctk.CTkFrame(atributos_frame_ficha, **ESTILO_PAINEL)
+            bloco_atributo.grid(row=0, column=coluna, sticky="ew", padx=6)
             ctk.CTkLabel(
-                atributos_frame_ficha,
-                text=nome_atributo,
-                font=ctk.CTkFont(size=11)
-            ).grid(row=0, column=coluna, sticky="w", padx=5, pady=(4, 0))
+                bloco_atributo,
+                text=nome_atributo.upper(),
+                font=fonte(11, "bold"),
+                **ESTILO_ROTULO
+            ).pack(pady=(10, 0))
             valor_atributo = ctk.CTkLabel(
-                atributos_frame_ficha,
+                bloco_atributo,
                 text=atributos_salvos_ficha.get(nome_atributo, "1"),
-                font=ctk.CTkFont(size=16, weight="bold")
+                font=fonte(24, "bold")
             )
-            valor_atributo.grid(row=1, column=coluna, sticky="w", padx=5, pady=(0, 4))
+            valor_atributo.pack(pady=(0, 10))
             valores_atributos_ficha[nome_atributo] = valor_atributo
 
-        ctk.CTkLabel(info_frame, text="História:", anchor="w").grid(row=7, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
-        historia_text = ctk.CTkTextbox(info_frame, width=460, height=180)
-        historia_text.grid(row=8, column=0, columnspan=2, sticky="nsew", padx=10, pady=(0, 10))
-        info_frame.grid_rowconfigure(8, weight=1)
+        historia_card = ctk.CTkFrame(info_frame, **ESTILO_CARD)
+        historia_card.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 12))
+        criar_titulo_secao(historia_card, "História").pack(anchor="w", padx=20, pady=(16, 8))
+        historia_text = ctk.CTkTextbox(historia_card, width=460, height=180, wrap="word")
+        historia_text.pack(fill="x", padx=20, pady=(0, 20))
         historia_text.insert("1.0", personagem.historia)
         historia_text.configure(state="disabled")
 
@@ -887,25 +1032,22 @@ class GerenciadorGUI(ctk.CTk):
     def _abrir_seletor_habilidades(self, personagem, atualizar_habilidades):
         janela = ctk.CTkToplevel(self)
         janela.title(f"Adicionar Habilidade - {personagem.nome}")
-        janela.geometry("620x520")
+        janela.geometry("720x560")
         janela.minsize(500, 400)
         janela.grab_set()
 
-        filtro_frame = ctk.CTkFrame(janela)
-        filtro_frame.pack(fill="x", padx=20, pady=(20, 10))
-        ctk.CTkLabel(filtro_frame, text="Categoria:").pack(side="left", padx=(10, 8), pady=12)
+        filtro_frame = ctk.CTkFrame(janela, fg_color="transparent")
+        filtro_frame.pack(fill="x", padx=20, pady=(20, 8))
+        criar_rotulo_campo(filtro_frame, "Categoria", width=72).pack(side="left", padx=(0, 10))
 
         busca_frame = ctk.CTkFrame(janela, fg_color="transparent")
         busca_frame.pack(fill="x", padx=20, pady=(0, 10))
-        ctk.CTkLabel(
-            busca_frame,
-            text="Buscar Habilidades:",
-            font=ctk.CTkFont(weight="bold")
-        ).pack(side="left", padx=(0, 10))
+        criar_rotulo_campo(busca_frame, "Buscar", width=72).pack(side="left", padx=(0, 10))
         busca_var = StringVar()
         busca_entrada = ctk.CTkEntry(
             busca_frame,
             textvariable=busca_var,
+            height=36,
             placeholder_text="Digite o nome da habilidade"
         )
         busca_entrada.pack(side="left", fill="x", expand=True)
@@ -916,10 +1058,10 @@ class GerenciadorGUI(ctk.CTk):
         conteudo_frame.grid_columnconfigure(1, weight=2)
         conteudo_frame.grid_rowconfigure(0, weight=1)
 
-        poderes_frame = ctk.CTkScrollableFrame(conteudo_frame)
+        poderes_frame = ctk.CTkScrollableFrame(conteudo_frame, **ESTILO_PAINEL)
         poderes_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        detalhes_frame = ctk.CTkFrame(conteudo_frame)
+        detalhes_frame = ctk.CTkFrame(conteudo_frame, **ESTILO_PAINEL)
         detalhes_frame.grid(row=0, column=1, sticky="nsew")
         habilidade_selecionada = {"nome": None}
 
@@ -938,13 +1080,16 @@ class GerenciadorGUI(ctk.CTk):
 
         ctk.CTkButton(
             detalhes_frame,
-            text="Adicionar habilidade",
+            text="+  Adicionar habilidade",
+            font=fonte(13, "bold"),
             command=adicionar_habilidade
         ).pack(side="bottom", anchor="w", padx=20, pady=20)
         titulo_habilidade = ctk.CTkLabel(
             detalhes_frame,
             text="Selecione uma habilidade",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            font=fonte(19, "bold"),
+            anchor="w",
+            justify="left",
             wraplength=260
         )
         titulo_habilidade.pack(anchor="nw", padx=20, pady=(20, 12))
@@ -975,7 +1120,8 @@ class GerenciadorGUI(ctk.CTk):
             if not poderes:
                 ctk.CTkLabel(
                     poderes_frame,
-                    text="Nenhuma habilidade encontrada."
+                    text="Nenhuma habilidade encontrada.",
+                    **ESTILO_ROTULO
                 ).pack(anchor="w", padx=10, pady=10)
                 return
 
@@ -984,10 +1130,9 @@ class GerenciadorGUI(ctk.CTk):
                     poderes_frame,
                     text=poder,
                     anchor="w",
-                    fg_color="transparent",
-                    hover_color=("#D9D9D9", "#3A3A3A"),
+                    **ESTILO_ITEM_LISTA,
                     command=lambda habilidade=poder: exibir_detalhes(habilidade)
-                ).pack(fill="x", padx=6, pady=3)
+                ).pack(fill="x", padx=4, pady=1)
 
         def exibir_detalhes(habilidade):
             habilidade_selecionada["nome"] = habilidade
@@ -1003,9 +1148,10 @@ class GerenciadorGUI(ctk.CTk):
             filtro_frame,
             values=FILTROS_HABILIDADES,
             command=atualizar_poderes,
+            height=36,
             dynamic_resizing=False
         )
-        filtro.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=8)
+        filtro.pack(side="left", fill="x", expand=True)
         filtro.set("Combatente")
         atualizar_poderes("Combatente")
         busca_var.trace_add("write", lambda *args: atualizar_poderes())
@@ -1014,13 +1160,13 @@ class GerenciadorGUI(ctk.CTk):
     def _abrir_seletor_rituais(self, personagem, atualizar_rituais):
         janela = ctk.CTkToplevel(self)
         janela.title(f"Adicionar Ritual - {personagem.nome}")
-        janela.geometry("620x520")
+        janela.geometry("720x560")
         janela.minsize(500, 400)
         janela.grab_set()
 
         filtros_frame = ctk.CTkFrame(janela, fg_color="transparent")
         filtros_frame.pack(fill="x", padx=20, pady=(20, 10))
-        ctk.CTkLabel(filtros_frame, text="Símbolos:").pack(side="left", padx=(0, 10))
+        criar_rotulo_campo(filtros_frame, "Símbolos").pack(side="left", padx=(0, 10))
         selecionados = set()
         ritual_selecionado = {"nome": None, "simbolo": None}
 
@@ -1029,15 +1175,17 @@ class GerenciadorGUI(ctk.CTk):
         conteudo_frame.grid_columnconfigure(0, weight=1)
         conteudo_frame.grid_columnconfigure(1, weight=2)
         conteudo_frame.grid_rowconfigure(0, weight=1)
-        rituais_frame = ctk.CTkScrollableFrame(conteudo_frame)
+        rituais_frame = ctk.CTkScrollableFrame(conteudo_frame, **ESTILO_PAINEL)
         rituais_frame.grid(row=0, column=0, sticky="nsew")
 
-        detalhes_frame = ctk.CTkFrame(conteudo_frame)
+        detalhes_frame = ctk.CTkFrame(conteudo_frame, **ESTILO_PAINEL)
         detalhes_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         titulo_ritual = ctk.CTkLabel(
             detalhes_frame,
             text="Selecione um ritual",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            font=fonte(19, "bold"),
+            anchor="w",
+            justify="left",
             wraplength=240
         )
         titulo_ritual.pack(anchor="nw", padx=20, pady=(20, 12))
@@ -1073,7 +1221,8 @@ class GerenciadorGUI(ctk.CTk):
             if not rituais_filtrados:
                 ctk.CTkLabel(
                     rituais_frame,
-                    text="Nenhum ritual cadastrado para os filtros selecionados."
+                    text="Nenhum ritual cadastrado para os filtros selecionados.",
+                    **ESTILO_ROTULO
                 ).pack(anchor="w", padx=10, pady=10)
                 return
 
@@ -1082,10 +1231,9 @@ class GerenciadorGUI(ctk.CTk):
                     rituais_frame,
                     text=ritual["nome"],
                     anchor="w",
-                    fg_color="transparent",
-                    hover_color=("#D9D9D9", "#3A3A3A"),
+                    **ESTILO_ITEM_LISTA,
                     command=lambda item=ritual: selecionar_ritual(item)
-                ).pack(fill="x", padx=10, pady=4)
+                ).pack(fill="x", padx=4, pady=1)
 
         def alternar_simbolo(simbolo, variavel):
             if variavel.get():
@@ -1101,7 +1249,7 @@ class GerenciadorGUI(ctk.CTk):
                 text=simbolo,
                 variable=simbolo_var,
                 command=lambda nome=simbolo, valor=simbolo_var: alternar_simbolo(nome, valor)
-            ).pack(side="left", padx=4)
+            ).pack(side="left", padx=(0, 12))
 
         atualizar_lista_filtrada()
 
@@ -1125,7 +1273,8 @@ class GerenciadorGUI(ctk.CTk):
 
         ctk.CTkButton(
             detalhes_frame,
-            text="Adicionar ritual",
+            text="+  Adicionar ritual",
+            font=fonte(13, "bold"),
             command=adicionar_ritual
         ).pack(side="bottom", anchor="w", padx=20, pady=20)
 
@@ -1144,14 +1293,14 @@ class GerenciadorGUI(ctk.CTk):
         valores_atributos_ficha = ficha_widgets["valores_atributos_ficha"]
         historia_text = ficha_widgets["historia_text"]
 
-        edicao_frame = ctk.CTkFrame(tab_edicao)
-        edicao_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        edicao_frame = ctk.CTkScrollableFrame(tab_edicao, fg_color="transparent")
+        edicao_frame.pack(fill="both", expand=True, padx=4, pady=4)
         edicao_frame.grid_columnconfigure(1, weight=1)
 
         dados_pericias_edicao = self._carregar_dados_pericias(personagem)
         valores_recursos_iniciais = calcular_recursos(personagem, dados_pericias_edicao)
-        recursos_frame_edicao = ctk.CTkFrame(edicao_frame)
-        recursos_frame_edicao.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
+        recursos_frame_edicao = ctk.CTkFrame(edicao_frame, **ESTILO_PAINEL)
+        recursos_frame_edicao.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 12))
         recursos_frame_edicao.grid_columnconfigure((0, 1, 2), weight=1)
         nomes_recursos = {
             "pv": "PV",
@@ -1165,36 +1314,32 @@ class GerenciadorGUI(ctk.CTk):
         for indice, (chave, nome) in enumerate(nomes_recursos.items()):
             linha = (indice // 3) * 2
             coluna = indice % 3
-            ctk.CTkLabel(
-                recursos_frame_edicao,
-                text=f"{nome}:",
-                font=ctk.CTkFont(size=12)
-            ).grid(row=linha, column=coluna, sticky="w", padx=10, pady=(8, 0))
+            criar_rotulo_campo(recursos_frame_edicao, nome).grid(
+                row=linha, column=coluna, sticky="w", padx=14, pady=(12, 4)
+            )
             campo = ctk.CTkEntry(recursos_frame_edicao, width=100)
-            campo.grid(row=linha + 1, column=coluna, sticky="w", padx=10, pady=(0, 8))
+            campo.grid(row=linha + 1, column=coluna, sticky="w", padx=14, pady=(0, 4))
             campo.insert(0, str(valores_recursos_iniciais[chave]))
             campos_recursos[chave] = campo
 
-        ctk.CTkLabel(
-            recursos_frame_edicao,
-            text="Deslocamento:",
-            font=ctk.CTkFont(size=12)
-        ).grid(row=4, column=0, sticky="w", padx=10, pady=(8, 0))
-        deslocamento_edicao = ctk.CTkEntry(recursos_frame_edicao, width=90)
-        deslocamento_edicao.grid(row=5, column=0, sticky="w", padx=10, pady=(0, 8))
+        criar_rotulo_campo(recursos_frame_edicao, "Deslocamento").grid(
+            row=4, column=0, sticky="w", padx=14, pady=(12, 4)
+        )
+        deslocamento_edicao = ctk.CTkEntry(recursos_frame_edicao, width=100)
+        deslocamento_edicao.grid(row=5, column=0, sticky="w", padx=14, pady=(0, 14))
         deslocamento_edicao.insert(0, getattr(personagem, "deslocamento", None) or "9m/6q")
 
-        ctk.CTkLabel(edicao_frame, text="Classe:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, "Classe").grid(
             row=1, column=0, sticky="w", padx=10, pady=10
         )
-        ctk.CTkLabel(edicao_frame, text=personagem.classe, anchor="e").grid(
-            row=1, column=1, sticky="e", padx=10, pady=10
+        ctk.CTkLabel(edicao_frame, text=personagem.classe, anchor="w", font=fonte(13, "bold")).grid(
+            row=1, column=1, sticky="w", padx=10, pady=10
         )
 
         _, limite_nivel_edicao = obter_limites_nivel(personagem.classe)
         nome_nivel_edicao = obter_nome_nivel(personagem.classe)
 
-        ctk.CTkLabel(edicao_frame, text=f"{nome_nivel_edicao}:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, nome_nivel_edicao).grid(
             row=2, column=0, sticky="w", padx=10, pady=10
         )
         nivel_edicao = ctk.CTkOptionMenu(
@@ -1209,14 +1354,14 @@ class GerenciadorGUI(ctk.CTk):
             else "1"
         )
 
-        ctk.CTkLabel(edicao_frame, text="NEX:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, "NEX (%)").grid(
             row=3, column=0, sticky="w", padx=10, pady=10
         )
         nex_edicao = ctk.CTkEntry(edicao_frame, width=100)
         nex_edicao.grid(row=3, column=1, sticky="w", padx=10, pady=10)
         nex_edicao.insert(0, str(personagem.nex))
 
-        nex_edicao_erro = ctk.CTkLabel(edicao_frame, text="", text_color="red", anchor="w")
+        nex_edicao_erro = ctk.CTkLabel(edicao_frame, text="", text_color=CORES["perigo"], anchor="w", font=fonte(12))
         nex_edicao_erro.grid(row=4, column=1, sticky="w", padx=10, pady=(0, 4))
 
         def validar_nex_edicao(event=None):
@@ -1232,17 +1377,17 @@ class GerenciadorGUI(ctk.CTk):
         nex_edicao.bind("<FocusOut>", validar_nex_edicao)
         validar_nex_edicao()
 
-        ctk.CTkLabel(edicao_frame, text="Origem:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, "Origem").grid(
             row=5, column=0, sticky="w", padx=10, pady=10
         )
         origem_edicao = ScrollableOriginOptionMenu(edicao_frame, values=ORIGENS, width=460)
         origem_edicao.grid(row=5, column=1, sticky="ew", padx=10, pady=10)
         origem_edicao.set(getattr(personagem, "origem", None) or ORIGENS[0])
 
-        ctk.CTkLabel(edicao_frame, text="Atributos:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, "Atributos").grid(
             row=6, column=0, sticky="nw", padx=10, pady=10
         )
-        atributos_frame_edicao = ctk.CTkFrame(edicao_frame)
+        atributos_frame_edicao = ctk.CTkFrame(edicao_frame, **ESTILO_PAINEL)
         atributos_frame_edicao.grid(row=6, column=1, sticky="ew", padx=10, pady=10)
         atributos_frame_edicao.grid_columnconfigure(tuple(range(5)), weight=1)
 
@@ -1255,18 +1400,18 @@ class GerenciadorGUI(ctk.CTk):
 
         atributos_edicao = {}
         for coluna, nome_atributo in enumerate(atributos_nomes):
-            ctk.CTkLabel(atributos_frame_edicao, text=nome_atributo).grid(
-                row=0, column=coluna, sticky="w", padx=5, pady=(0, 5)
+            ctk.CTkLabel(atributos_frame_edicao, text=nome_atributo.upper(), font=fonte(11, "bold"), **ESTILO_ROTULO).grid(
+                row=0, column=coluna, padx=8, pady=(10, 4)
             )
-            valor_atributo = ctk.CTkEntry(atributos_frame_edicao, width=70)
-            valor_atributo.grid(row=1, column=coluna, sticky="ew", padx=5, pady=5)
+            valor_atributo = ctk.CTkEntry(atributos_frame_edicao, width=70, justify="center", font=fonte(15, "bold"))
+            valor_atributo.grid(row=1, column=coluna, sticky="ew", padx=8, pady=(0, 12))
             valor_atributo.insert(0, atributos_salvos.get(nome_atributo, "1"))
             atributos_edicao[nome_atributo] = valor_atributo
 
-        ctk.CTkLabel(edicao_frame, text="História:", anchor="w").grid(
+        criar_rotulo_campo(edicao_frame, "História").grid(
             row=7, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0)
         )
-        historia_edicao = ctk.CTkTextbox(edicao_frame, height=260)
+        historia_edicao = ctk.CTkTextbox(edicao_frame, height=260, wrap="word")
         historia_edicao.grid(row=8, column=0, columnspan=2, sticky="nsew", padx=10, pady=(0, 10))
         edicao_frame.grid_rowconfigure(8, weight=1)
         historia_edicao.insert("1.0", personagem.historia or "")
@@ -1341,22 +1486,18 @@ class GerenciadorGUI(ctk.CTk):
                     dados_pericias,
                     valores_editados=ajustes_recursos,
                 )
-                valor_pv_ficha.configure(text=f"PV: {recursos_atualizados['pv']}")
-                valor_pd_ficha.configure(text=f"PD: {recursos_atualizados['pd']}")
-                pd_turno_ficha.configure(text=f"PD/Turno: {recursos_atualizados['pd_turno']}")
-                valor_defesa_ficha.configure(text=f"Defesa: {recursos_atualizados['defesa']}")
-                valor_deslocamento_ficha.configure(
-                    text=f"Deslocamento: {personagem.deslocamento}"
-                )
-                esquiva_var.set(f"Esquiva: {recursos_atualizados['esquiva']}")
-                bloqueio_var.set(f"Bloqueio: {recursos_atualizados['bloqueio']}")
+                valor_pv_ficha.configure(text=str(recursos_atualizados['pv']))
+                valor_pd_ficha.configure(text=str(recursos_atualizados['pd']))
+                pd_turno_ficha.configure(text=str(recursos_atualizados['pd_turno']))
+                valor_defesa_ficha.configure(text=str(recursos_atualizados['defesa']))
+                valor_deslocamento_ficha.configure(text=personagem.deslocamento)
+                esquiva_var.set(str(recursos_atualizados['esquiva']))
+                bloqueio_var.set(str(recursos_atualizados['bloqueio']))
                 valores_recursos_iniciais.update(recursos_atualizados)
                 for chave, campo in campos_recursos.items():
                     campo.delete(0, "end")
                     campo.insert(0, str(recursos_atualizados[chave]))
-                resumo_ficha.configure(
-                    text=f"Classe: {personagem.classe} | Nível: {personagem.nivel} | NEX: {personagem.nex}% | Origem: {personagem.origem or 'Não informada'}"
-                )
+                resumo_ficha.configure(text=texto_resumo_personagem(personagem))
                 valor_nivel.configure(text=str(personagem.nivel))
                 valor_nex.configure(text=f"{personagem.nex}%")
                 valor_origem.configure(text=personagem.origem or "Não informada")
@@ -1380,17 +1521,20 @@ class GerenciadorGUI(ctk.CTk):
         ctk.CTkButton(
             edicao_frame,
             text="Salvar Alterações",
+            height=40,
+            font=fonte(14, "bold"),
             command=salvar_edicao
         ).grid(row=9, column=1, sticky="e", padx=10, pady=10)
 
     def _criar_aba_pericias(self, tab_pericias, personagem, ficha, esquiva_var, bloqueio_var):
-        pericias_frame = ctk.CTkScrollableFrame(tab_pericias)
-        pericias_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        pericias_frame = ctk.CTkScrollableFrame(tab_pericias, **ESTILO_PAINEL)
+        pericias_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        pericias_frame.grid_columnconfigure(0, weight=1)
 
         headers = ["Pericia", "Treino", "Atributo", "Extra", "Total"]
         for index, titulo in enumerate(headers):
-            ctk.CTkLabel(pericias_frame, text=titulo, font=ctk.CTkFont(weight="bold")).grid(
-                row=0, column=index, padx=8, pady=(0, 6), sticky="w"
+            ctk.CTkLabel(pericias_frame, text=titulo.upper(), font=fonte(11, "bold"), **ESTILO_ROTULO).grid(
+                row=0, column=index, padx=8, pady=(8, 6), sticky="w"
             )
 
         dados_pericias_salvos = self._carregar_dados_pericias(personagem)
@@ -1425,7 +1569,15 @@ class GerenciadorGUI(ctk.CTk):
             )
 
             total_var = StringVar(value=str(dados_pericia.get("total", 0)))
-            ctk.CTkLabel(pericias_frame, textvariable=total_var, anchor="w", width=60).grid(
+            ctk.CTkLabel(
+                pericias_frame,
+                textvariable=total_var,
+                width=48,
+                corner_radius=8,
+                fg_color=CORES["destaque_suave"],
+                text_color=CORES["destaque"],
+                font=fonte(13, "bold")
+            ).grid(
                 row=row_index, column=4, padx=8, pady=2, sticky="w"
             )
 
@@ -1470,8 +1622,8 @@ class GerenciadorGUI(ctk.CTk):
                 })
 
             recursos_atualizados = calcular_recursos(personagem, dados_para_salvar)
-            esquiva_var.set(f"Esquiva: {recursos_atualizados['esquiva']}")
-            bloqueio_var.set(f"Bloqueio: {recursos_atualizados['bloqueio']}")
+            esquiva_var.set(str(recursos_atualizados['esquiva']))
+            bloqueio_var.set(str(recursos_atualizados['bloqueio']))
             self._salvar_pericias_personagem(personagem, dados_para_salvar)
 
         def salvar_e_fechar():
@@ -1484,7 +1636,9 @@ class GerenciadorGUI(ctk.CTk):
             row_state["extra_var"].set(row_state["extra_var"].get())
 
         atualizar_todas_as_pericias()
-        ctk.CTkButton(ficha, text="Fechar", command=salvar_e_fechar).pack(padx=20, pady=(0, 20))
+        ctk.CTkButton(ficha, text="Fechar", width=140, command=salvar_e_fechar, **ESTILO_BOTAO_SECUNDARIO).pack(
+            anchor="e", padx=20, pady=(0, 16)
+        )
 
     def atualizar_lista(self):
         for widget in self.lista_scroll.winfo_children():
@@ -1494,39 +1648,56 @@ class GerenciadorGUI(ctk.CTk):
             personagens = listar_personagens()
 
             if not personagens:
-                empty_label = ctk.CTkLabel(self.lista_scroll, text="Nenhum personagem encontrado no banco de dados.")
-                empty_label.pack(pady=20)
+                vazio = ctk.CTkFrame(self.lista_scroll, **ESTILO_CARD)
+                vazio.pack(fill="x", padx=6, pady=20)
+                ctk.CTkLabel(vazio, text="◈", font=fonte(32), text_color=CORES["destaque"]).pack(pady=(28, 4))
+                ctk.CTkLabel(vazio, text="Nenhum personagem encontrado no banco de dados.", font=fonte(15, "bold")).pack()
+                ctk.CTkLabel(
+                    vazio,
+                    text="Crie um novo personagem na aba \"Criar Personagem\".",
+                    **ESTILO_ROTULO
+                ).pack(pady=(2, 28))
                 return
 
             for personagem in personagens:
-                card = ctk.CTkFrame(self.lista_scroll, fg_color="#2B2B2B", corner_radius=15, border_width=1, border_color="#3A3A3A")
-                card.pack(fill="x", padx=10, pady=8)
+                card = ctk.CTkFrame(self.lista_scroll, **ESTILO_CARD)
+                card.pack(fill="x", padx=6, pady=6)
+                card.grid_columnconfigure(1, weight=1)
 
-                top_row = ctk.CTkFrame(card)
-                top_row.pack(fill="x", padx=12, pady=12)
+                criar_avatar(card, personagem.nome, 64).grid(row=0, column=0, rowspan=2, padx=(18, 14), pady=16)
 
-                photo_frame = ctk.CTkFrame(top_row, width=120, height=120, corner_radius=16)
-                photo_frame.grid(row=0, column=0, rowspan=2, padx=(0, 12), pady=0)
-                photo_frame.grid_propagate(False)
-                ctk.CTkLabel(photo_frame, text="Foto", font=ctk.CTkFont(size=16, weight="bold")).place(relx=0.5, rely=0.5, anchor="center")
-
-                ctk.CTkLabel(top_row, text=personagem.nome, font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=1, sticky="w")
+                ctk.CTkLabel(card, text=personagem.nome, font=fonte(17, "bold"), anchor="w").grid(
+                    row=0, column=1, sticky="sw", pady=(16, 2)
+                )
                 origem_valor = getattr(personagem, "origem", None) or ""
-                ctk.CTkLabel(top_row, text=f"Classe: {personagem.classe} | Nível: {personagem.nivel} | NEX: {personagem.nex}% | Origem: {origem_valor or 'Não informada'}").grid(row=1, column=1, sticky="w")
+                chips = ctk.CTkFrame(card, fg_color="transparent")
+                chips.grid(row=1, column=1, sticky="nw", pady=(2, 16))
+                for texto_chip in (
+                    personagem.classe,
+                    f"Nível {personagem.nivel}",
+                    f"NEX {personagem.nex}%",
+                    origem_valor or "Origem não informada",
+                ):
+                    criar_chip(chips, texto_chip).pack(side="left", padx=(0, 6))
 
-                footer_row = ctk.CTkFrame(card)
-                footer_row.pack(fill="x", padx=12, pady=(0, 12))
+                acoes = ctk.CTkFrame(card, fg_color="transparent")
+                acoes.grid(row=0, column=2, rowspan=2, padx=18, pady=16)
                 ctk.CTkButton(
-                    footer_row,
+                    acoes,
+                    text="Acessar Ficha",
+                    width=120,
+                    command=lambda p=personagem: self.abrir_ficha(p)
+                ).pack(side="left", padx=(0, 8))
+                ctk.CTkButton(
+                    acoes,
                     text="Remover",
+                    width=90,
                     command=lambda p=personagem: self.remover_personagem_confirm(p),
-                    fg_color="#D32F2F",
-                    hover_color="#C62828"
-                ).pack(side="right", padx=(0, 10))
-                ctk.CTkButton(footer_row, text="Acessar Ficha", command=lambda p=personagem: self.abrir_ficha(p)).pack(side="right")
+                    **ESTILO_BOTAO_PERIGO_CONTORNO
+                ).pack(side="left")
 
         except Exception as e:
-            error_label = ctk.CTkLabel(self.lista_scroll, text=f"Erro ao carregar personagens: {str(e)}", text_color="#FF6B6B")
+            error_label = ctk.CTkLabel(self.lista_scroll, text=f"Erro ao carregar personagens: {str(e)}", text_color=CORES["perigo"])
             error_label.pack(pady=20)
 
 
