@@ -26,6 +26,15 @@ CORES = {
     "esforco": ("#6A48F0", "#9C83FF"),
 }
 
+# Cor do texto de cada elemento paranormal nos rituais.
+CORES_ELEMENTOS = {
+    "Sangue": ("#C62839", "#F06272"),
+    "Morte": ("#4A4658", "#B9B5C9"),
+    "Conhecimento": ("#A87800", "#F2C14E"),
+    "Energia": ("#7A3FE0", "#B58CFF"),
+    "Medo": ("#1B1A24", "#FFFFFF"),
+}
+
 RAIO = 10
 
 

@@ -20,11 +20,7 @@ from app.character_storage import (
     carregar_habilidades,
     carregar_rituais,
     listar_personagens,
-    obter_descricao_habilidade,
-    obter_descricao_ritual,
     remover_personagem,
-    salvar_descricao_habilidade,
-    salvar_descricao_ritual,
     salvar_personagem as salvar_personagem_no_banco,
     salvar_habilidades,
     salvar_rituais,
@@ -35,14 +31,8 @@ from app.gui_data import (
     CLASSES,
     ORIGENS,
     PERICIAS,
-    SIMBOLOS_RITUAIS,
+    ELEMENTOS_RITUAIS,
     TRILHAS_POR_CLASSE,
-    FILTROS_HABILIDADES,
-    HABILIDADES_POR_CATEGORIA,
-    DESCRICOES_HABILIDADES,
-    RITUAIS_POR_SIMBOLO,
-    DESCRICOES_RITUAIS,
-    TEXTO_PADRAO_DESCRICAO,
     PATENTES,
     PATENTE_PADRAO,
     CATEGORIAS_ITENS,
@@ -63,6 +53,7 @@ from app.pericia_storage import (
 
 from app.theme import (
     CORES,
+    CORES_ELEMENTOS,
     ESTILO_BOTAO_PERIGO,
     ESTILO_BOTAO_PERIGO_CONTORNO,
     ESTILO_BOTAO_SECUNDARIO,
@@ -160,6 +151,37 @@ def criar_tabview(master, **kwargs):
     )
     tabview._segmented_button.configure(font=fonte(13, "bold"))
     return tabview
+
+
+CONFIG_HABILIDADES = {
+    "titulo": "Habilidades",
+    "singular": "Habilidade",
+    "artigo": "uma",
+    "do_registro": "da habilidade",
+    "novo": "Nova Habilidade",
+    "dica": "Cadastre as habilidades e poderes do seu personagem. Consulte o livro de regras e copie o nome e a descrição para cá.",
+    "vazio": "Nenhuma habilidade cadastrada ainda.\nClique em \"+ Nova Habilidade\" para criar a primeira.",
+    "selecione": "Selecione uma habilidade na lista.",
+    "vazio_lista": "Nenhuma habilidade.",
+    "carregar": carregar_habilidades,
+    "salvar": salvar_habilidades,
+    "usa_elemento": False,
+}
+
+CONFIG_RITUAIS = {
+    "titulo": "Rituais",
+    "singular": "Ritual",
+    "artigo": "um",
+    "do_registro": "do ritual",
+    "novo": "Novo Ritual",
+    "dica": "Cadastre os rituais que seu personagem conhece. Consulte o livro de regras e copie o nome, o elemento e a descrição para cá.",
+    "vazio": "Nenhum ritual cadastrado ainda.\nClique em \"+ Novo Ritual\" para criar o primeiro.",
+    "selecione": "Selecione um ritual na lista.",
+    "vazio_lista": "Nenhum ritual.",
+    "carregar": carregar_rituais,
+    "salvar": salvar_rituais,
+    "usa_elemento": True,
+}
 
 
 class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
@@ -651,290 +673,8 @@ class GerenciadorGUI(ctk.CTk):
         tab_rituais = tabview.add("Rituais")
         tab_inventario = tabview.add("Inventário")
 
-        habilidades_header = ctk.CTkFrame(tab_habilidades, fg_color="transparent")
-        habilidades_header.pack(fill="x", padx=12, pady=(12, 12))
-        ctk.CTkButton(
-            habilidades_header,
-            text="+  Adicionar Habilidade",
-            font=fonte(13, "bold"),
-            command=lambda: self._abrir_seletor_habilidades(personagem, atualizar_habilidades)
-        ).pack(side="left")
-
-        habilidades_conteudo = ctk.CTkFrame(tab_habilidades, fg_color="transparent")
-        habilidades_conteudo.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        habilidades_conteudo.grid_columnconfigure(0, weight=1)
-        habilidades_conteudo.grid_columnconfigure(1, weight=2)
-        habilidades_conteudo.grid_rowconfigure(0, weight=1)
-
-        habilidades_frame = ctk.CTkScrollableFrame(habilidades_conteudo, **ESTILO_PAINEL)
-        habilidades_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-
-        habilidade_detalhes = ctk.CTkFrame(habilidades_conteudo, **ESTILO_PAINEL)
-        habilidade_detalhes.grid(row=0, column=1, sticky="nsew")
-        habilidade_titulo = ctk.CTkLabel(
-            habilidade_detalhes,
-            text="Selecione uma habilidade",
-            font=fonte(19, "bold"),
-            anchor="w",
-            justify="left",
-            wraplength=260
-        )
-        habilidade_titulo.pack(anchor="nw", padx=20, pady=(20, 12))
-        habilidade_descricao = ctk.CTkLabel(
-            habilidade_detalhes,
-            text="",
-            anchor="nw",
-            justify="left",
-            wraplength=260
-        )
-        habilidade_descricao.pack(fill="x", anchor="nw", padx=20, pady=(0, 20))
-        habilidade_selecionada = {"nome": None}
-        botao_editar_descricao_habilidade = ctk.CTkButton(
-            habilidade_detalhes,
-            text="Editar Descrição",
-            command=lambda: abrir_editor_descricao_habilidade(),
-            **ESTILO_BOTAO_SECUNDARIO
-        )
-        botao_editar_descricao_habilidade.pack_forget()
-        botao_remover_habilidade = ctk.CTkButton(
-            habilidade_detalhes,
-            text="Remover Habilidade",
-            command=lambda: remover_habilidade_selecionada(),
-            **ESTILO_BOTAO_PERIGO_CONTORNO,
-            state="normal"
-        )
-        botao_remover_habilidade.pack_forget()
-
-        def abrir_editor_descricao_habilidade():
-            nome_habilidade = habilidade_selecionada["nome"]
-            if not nome_habilidade:
-                return
-
-            descricao_atual = obter_descricao_habilidade(personagem, nome_habilidade)
-            if descricao_atual is None:
-                descricao_atual = DESCRICOES_HABILIDADES.get(nome_habilidade, "")
-
-            editor = ctk.CTkToplevel(self)
-            editor.title(f"Editar descrição - {nome_habilidade}")
-            editor.geometry("480x320")
-            editor.grab_set()
-
-            ctk.CTkLabel(editor, text=f"Descrição de {nome_habilidade}", font=fonte(15, "bold"), anchor="w").pack(fill="x", padx=20, pady=(20, 10))
-            campo = ctk.CTkTextbox(editor, height=140, wrap="word")
-            campo.pack(fill="both", expand=True, padx=20, pady=(0, 10))
-            campo.insert("1.0", descricao_atual)
-
-            def salvar_descricao():
-                texto = campo.get("1.0", "end").strip()
-                salvar_descricao_habilidade(personagem, nome_habilidade, texto)
-                habilidade_descricao.configure(text=texto or TEXTO_PADRAO_DESCRICAO)
-                editor.destroy()
-
-            ctk.CTkButton(editor, text="Salvar", font=fonte(13, "bold"), command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
-
-        def remover_habilidade_selecionada():
-            nome_habilidade = habilidade_selecionada["nome"]
-            if not nome_habilidade:
-                return
-
-            habilidades = carregar_habilidades(personagem)
-            if nome_habilidade in habilidades:
-                habilidades.remove(nome_habilidade)
-                salvar_habilidades(personagem, habilidades)
-
-            limpar_selecao_habilidade()
-            atualizar_habilidades()
-
-        def atualizar_habilidades():
-            for widget in habilidades_frame.winfo_children():
-                widget.destroy()
-
-            habilidades = carregar_habilidades(personagem)
-            if not habilidades:
-                ctk.CTkLabel(
-                    habilidades_frame,
-                    text="Nenhuma habilidade adicionada.",
-                    **ESTILO_ROTULO
-                ).pack(anchor="w", padx=10, pady=10)
-                limpar_selecao_habilidade()
-                return
-
-            for habilidade in habilidades:
-                ctk.CTkButton(
-                    habilidades_frame,
-                    text=habilidade,
-                    anchor="w",
-                    **ESTILO_ITEM_LISTA,
-                    command=lambda nome=habilidade: exibir_habilidade(nome)
-                ).pack(fill="x", padx=4, pady=1)
-
-        def exibir_habilidade(habilidade):
-            habilidade_selecionada["nome"] = habilidade
-            descricao_personalizada = obter_descricao_habilidade(personagem, habilidade)
-            habilidade_titulo.configure(text=habilidade)
-            habilidade_descricao.configure(
-                text=descricao_personalizada if descricao_personalizada is not None else DESCRICOES_HABILIDADES.get(habilidade, TEXTO_PADRAO_DESCRICAO)
-            )
-            botao_editar_descricao_habilidade.configure(state="normal")
-            botao_remover_habilidade.configure(state="normal")
-            botao_editar_descricao_habilidade.pack(anchor="w", padx=20, pady=(0, 8))
-            botao_remover_habilidade.pack(anchor="w", padx=20, pady=(0, 20))
-
-        def limpar_selecao_habilidade():
-            habilidade_selecionada["nome"] = None
-            habilidade_titulo.configure(text="Selecione uma habilidade")
-            habilidade_descricao.configure(text="")
-            botao_editar_descricao_habilidade.configure(state="disabled")
-            botao_editar_descricao_habilidade.pack_forget()
-            botao_remover_habilidade.configure(state="disabled")
-            botao_remover_habilidade.pack_forget()
-
-        botao_editar_descricao_habilidade.configure(state="disabled")
-        atualizar_habilidades()
-
-        rituais_header = ctk.CTkFrame(tab_rituais, fg_color="transparent")
-        rituais_header.pack(fill="x", padx=12, pady=(12, 12))
-        ctk.CTkButton(
-            rituais_header,
-            text="+  Adicionar Ritual",
-            font=fonte(13, "bold"),
-            command=lambda: self._abrir_seletor_rituais(personagem, atualizar_rituais)
-        ).pack(side="left")
-
-        rituais_conteudo = ctk.CTkFrame(tab_rituais, fg_color="transparent")
-        rituais_conteudo.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        rituais_conteudo.grid_columnconfigure(0, weight=1)
-        rituais_conteudo.grid_columnconfigure(1, weight=2)
-        rituais_conteudo.grid_rowconfigure(0, weight=1)
-
-        rituais_frame = ctk.CTkScrollableFrame(rituais_conteudo, **ESTILO_PAINEL)
-        rituais_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-
-        ritual_detalhes = ctk.CTkFrame(rituais_conteudo, **ESTILO_PAINEL)
-        ritual_detalhes.grid(row=0, column=1, sticky="nsew")
-        ritual_titulo = ctk.CTkLabel(
-            ritual_detalhes,
-            text="Selecione um ritual",
-            font=fonte(19, "bold"),
-            anchor="w",
-            justify="left",
-            wraplength=260
-        )
-        ritual_titulo.pack(anchor="nw", padx=20, pady=(20, 12))
-        ritual_descricao = ctk.CTkLabel(
-            ritual_detalhes,
-            text="",
-            anchor="nw",
-            justify="left",
-            wraplength=260
-        )
-        ritual_descricao.pack(fill="x", anchor="nw", padx=20, pady=(0, 20))
-        ritual_selecionado = {"nome": None}
-        botao_editar_descricao_ritual = ctk.CTkButton(
-            ritual_detalhes,
-            text="Editar Descrição",
-            command=lambda: abrir_editor_descricao_ritual(),
-            **ESTILO_BOTAO_SECUNDARIO
-        )
-        botao_editar_descricao_ritual.pack_forget()
-        botao_remover_ritual = ctk.CTkButton(
-            ritual_detalhes,
-            text="Remover Ritual",
-            command=lambda: remover_ritual_selecionado(),
-            **ESTILO_BOTAO_PERIGO_CONTORNO
-        )
-        botao_remover_ritual.pack_forget()
-
-        def abrir_editor_descricao_ritual():
-            nome_ritual = ritual_selecionado["nome"]
-            if not nome_ritual:
-                return
-
-            descricao_atual = obter_descricao_ritual(personagem, nome_ritual)
-            if descricao_atual is None:
-                descricao_atual = DESCRICOES_RITUAIS.get(nome_ritual, "")
-
-            editor = ctk.CTkToplevel(self)
-            editor.title(f"Editar descrição - {nome_ritual}")
-            editor.geometry("480x320")
-            editor.grab_set()
-
-            ctk.CTkLabel(editor, text=f"Descrição de {nome_ritual}", font=fonte(15, "bold"), anchor="w").pack(fill="x", padx=20, pady=(20, 10))
-            campo = ctk.CTkTextbox(editor, height=140, wrap="word")
-            campo.pack(fill="both", expand=True, padx=20, pady=(0, 10))
-            campo.insert("1.0", descricao_atual)
-
-            def salvar_descricao():
-                texto = campo.get("1.0", "end").strip()
-                salvar_descricao_ritual(personagem, nome_ritual, texto)
-                ritual_descricao.configure(text=texto or TEXTO_PADRAO_DESCRICAO)
-                editor.destroy()
-
-            ctk.CTkButton(editor, text="Salvar", font=fonte(13, "bold"), command=salvar_descricao).pack(anchor="e", padx=20, pady=(0, 20))
-
-        def limpar_selecao_ritual():
-            ritual_selecionado["nome"] = None
-            ritual_titulo.configure(text="Selecione um ritual")
-            ritual_descricao.configure(text="")
-            botao_editar_descricao_ritual.configure(state="disabled")
-            botao_editar_descricao_ritual.pack_forget()
-            botao_remover_ritual.configure(state="disabled")
-            botao_remover_ritual.pack_forget()
-
-        def remover_ritual_selecionado():
-            nome_ritual = ritual_selecionado["nome"]
-            if not nome_ritual:
-                return
-
-            rituais = carregar_rituais(personagem)
-            for ritual in rituais:
-                if ritual.get("nome") == nome_ritual:
-                    rituais.remove(ritual)
-                    break
-            salvar_rituais(personagem, rituais)
-
-            limpar_selecao_ritual()
-            atualizar_rituais()
-
-        def atualizar_rituais():
-            for widget in rituais_frame.winfo_children():
-                widget.destroy()
-
-            rituais = carregar_rituais(personagem)
-            if not rituais:
-                ctk.CTkLabel(
-                    rituais_frame,
-                    text="Nenhum ritual adicionado.",
-                    **ESTILO_ROTULO
-                ).pack(anchor="w", padx=10, pady=10)
-                limpar_selecao_ritual()
-                return
-
-            for ritual in rituais:
-                nome_ritual = ritual.get("nome", "")
-                ctk.CTkButton(
-                    rituais_frame,
-                    text=nome_ritual,
-                    anchor="w",
-                    **ESTILO_ITEM_LISTA,
-                    command=lambda nome=nome_ritual: exibir_ritual(nome)
-                ).pack(fill="x", padx=4, pady=1)
-
-        def exibir_ritual(ritual):
-            ritual_selecionado["nome"] = ritual
-            descricao_personalizada = obter_descricao_ritual(personagem, ritual)
-            ritual_titulo.configure(text=ritual)
-            ritual_descricao.configure(
-                text=descricao_personalizada if descricao_personalizada is not None else DESCRICOES_RITUAIS.get(ritual, TEXTO_PADRAO_DESCRICAO)
-            )
-            botao_editar_descricao_ritual.configure(state="normal")
-            botao_remover_ritual.configure(state="normal")
-            botao_editar_descricao_ritual.pack(anchor="w", padx=20, pady=(0, 8))
-            botao_remover_ritual.pack(anchor="w", padx=20, pady=(0, 20))
-
-        botao_editar_descricao_ritual.configure(state="disabled")
-        botao_remover_ritual.configure(state="disabled")
-        atualizar_rituais()
+        self._criar_aba_registros(tab_habilidades, personagem, CONFIG_HABILIDADES)
+        self._criar_aba_registros(tab_rituais, personagem, CONFIG_RITUAIS)
 
         info_frame = ctk.CTkScrollableFrame(tab_dados, fg_color="transparent")
         info_frame.pack(fill="both", expand=True, padx=4, pady=(0, 4))
@@ -1058,254 +798,237 @@ class GerenciadorGUI(ctk.CTk):
 
         self._criar_aba_pericias(tab_pericias, personagem, ficha, esquiva_var, bloqueio_var)
 
-    def _abrir_seletor_habilidades(self, personagem, atualizar_habilidades):
-        janela = ctk.CTkToplevel(self)
-        janela.title(f"Adicionar Habilidade - {personagem.nome}")
-        janela.geometry("720x560")
-        janela.minsize(500, 400)
-        janela.grab_set()
+    def _criar_aba_registros(self, tab, personagem, config):
+        """Aba de habilidades ou rituais cadastrados pelo próprio usuário."""
+        selecionado = {"indice": None}
 
-        filtro_frame = ctk.CTkFrame(janela, fg_color="transparent")
-        filtro_frame.pack(fill="x", padx=20, pady=(20, 8))
-        criar_rotulo_campo(filtro_frame, "Categoria", width=72).pack(side="left", padx=(0, 10))
+        cabecalho = ctk.CTkFrame(tab, **ESTILO_CARD)
+        cabecalho.pack(fill="x", padx=8, pady=(8, 10))
+        cabecalho.grid_columnconfigure(0, weight=1)
+        criar_titulo_secao(cabecalho, config["titulo"]).grid(row=0, column=0, sticky="w", padx=20, pady=(14, 0))
+        ctk.CTkLabel(
+            cabecalho,
+            text=config["dica"],
+            font=fonte(12),
+            anchor="w",
+            justify="left",
+            wraplength=520,
+            **ESTILO_ROTULO
+        ).grid(row=1, column=0, sticky="w", padx=20, pady=(2, 14))
+        ctk.CTkButton(
+            cabecalho,
+            text=f"+  {config['novo']}",
+            font=fonte(13, "bold"),
+            command=lambda: self._abrir_editor_registro(personagem, config, atualizar)
+        ).grid(row=0, column=1, rowspan=2, padx=20)
 
-        busca_frame = ctk.CTkFrame(janela, fg_color="transparent")
-        busca_frame.pack(fill="x", padx=20, pady=(0, 10))
-        criar_rotulo_campo(busca_frame, "Buscar", width=72).pack(side="left", padx=(0, 10))
-        busca_var = StringVar()
+        conteudo = ctk.CTkFrame(tab, fg_color="transparent")
+        conteudo.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        conteudo.grid_columnconfigure(0, weight=2, uniform="registros")
+        conteudo.grid_columnconfigure(1, weight=3, uniform="registros")
+        conteudo.grid_rowconfigure(0, weight=1)
+
+        # --- Lista ---
+        lista_painel = ctk.CTkFrame(conteudo, **ESTILO_PAINEL)
+        lista_painel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         busca_entrada = ctk.CTkEntry(
-            busca_frame,
-            textvariable=busca_var,
-            height=36,
-            placeholder_text="Digite o nome da habilidade"
+            lista_painel,
+            height=34,
+            placeholder_text="Buscar..."
         )
-        busca_entrada.pack(side="left", fill="x", expand=True)
+        busca_entrada.pack(fill="x", padx=10, pady=(10, 4))
+        lista_frame = ctk.CTkScrollableFrame(lista_painel, fg_color="transparent")
+        lista_frame.pack(fill="both", expand=True, padx=2, pady=(0, 6))
 
-        conteudo_frame = ctk.CTkFrame(janela, fg_color="transparent")
-        conteudo_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-        conteudo_frame.grid_columnconfigure(0, weight=1)
-        conteudo_frame.grid_columnconfigure(1, weight=2)
-        conteudo_frame.grid_rowconfigure(0, weight=1)
+        # --- Detalhes ---
+        detalhes = ctk.CTkFrame(conteudo, **ESTILO_PAINEL)
+        detalhes.grid(row=0, column=1, sticky="nsew")
+        titulo = ctk.CTkLabel(detalhes, text="", font=fonte(19, "bold"), anchor="w", justify="left", wraplength=320)
+        titulo.pack(fill="x", padx=20, pady=(18, 4))
+        elemento_chip = criar_chip(detalhes, "", fg_color=CORES["superficie"])
+        descricao = ctk.CTkTextbox(detalhes, wrap="word", fg_color="transparent", border_width=0)
+        acoes = ctk.CTkFrame(detalhes, fg_color="transparent")
+        ctk.CTkButton(
+            acoes,
+            text="Editar",
+            width=90,
+            command=lambda: self._abrir_editor_registro(personagem, config, atualizar, selecionado["indice"]),
+            **ESTILO_BOTAO_SECUNDARIO
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            acoes,
+            text="Remover",
+            width=90,
+            command=lambda: remover(),
+            **ESTILO_BOTAO_PERIGO_CONTORNO
+        ).pack(side="left")
+        vazio = ctk.CTkLabel(detalhes, text="", font=fonte(13), justify="center", wraplength=300, **ESTILO_ROTULO)
 
-        poderes_frame = ctk.CTkScrollableFrame(conteudo_frame, **ESTILO_PAINEL)
-        poderes_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-
-        detalhes_frame = ctk.CTkFrame(conteudo_frame, **ESTILO_PAINEL)
-        detalhes_frame.grid(row=0, column=1, sticky="nsew")
-        habilidade_selecionada = {"nome": None}
-
-        def adicionar_habilidade():
-            habilidade = habilidade_selecionada["nome"]
-            if not habilidade:
-                messagebox.showwarning("Atenção", "Selecione uma habilidade primeiro.")
+        def mostrar_detalhes(indice):
+            registros = config["carregar"](personagem)
+            if indice is None or not 0 <= indice < len(registros):
+                selecionado["indice"] = None
+                titulo.pack_forget()
+                elemento_chip.pack_forget()
+                descricao.pack_forget()
+                acoes.pack_forget()
+                vazio.configure(text=config["vazio"] if not registros else config["selecione"])
+                vazio.pack(expand=True, padx=20, pady=20)
+                atualizar_lista()
                 return
 
-            habilidades = carregar_habilidades(personagem)
-            if habilidade not in habilidades:
-                habilidades.append(habilidade)
-                salvar_habilidades(personagem, habilidades)
-                atualizar_habilidades()
-            janela.destroy()
+            selecionado["indice"] = indice
+            registro = registros[indice]
+            vazio.pack_forget()
+            acoes.pack_forget()
+            descricao.pack_forget()
+            elemento_chip.pack_forget()
+            titulo.pack(fill="x", padx=20, pady=(18, 4))
+            titulo.configure(text=registro["nome"])
+            if config["usa_elemento"] and registro.get("simbolo"):
+                elemento_chip.configure(
+                    text=registro["simbolo"],
+                    text_color=CORES_ELEMENTOS.get(registro["simbolo"], CORES["texto_suave"])
+                )
+                elemento_chip.pack(anchor="w", padx=20, pady=(0, 4))
+            acoes.pack(side="bottom", anchor="w", padx=20, pady=(4, 16))
+            descricao.pack(fill="both", expand=True, padx=14, pady=(4, 4))
+            descricao.configure(state="normal")
+            descricao.delete("1.0", "end")
+            descricao.insert("1.0", registro["descricao"] or "Sem descrição. Clique em Editar para adicionar.")
+            descricao.configure(state="disabled")
+            atualizar_lista()
 
-        ctk.CTkButton(
-            detalhes_frame,
-            text="+  Adicionar habilidade",
-            font=fonte(13, "bold"),
-            command=adicionar_habilidade
-        ).pack(side="bottom", anchor="w", padx=20, pady=20)
-        titulo_habilidade = ctk.CTkLabel(
-            detalhes_frame,
-            text="Selecione uma habilidade",
-            font=fonte(19, "bold"),
-            anchor="w",
-            justify="left",
-            wraplength=260
-        )
-        titulo_habilidade.pack(anchor="nw", padx=20, pady=(20, 12))
-        descricao_habilidade = ctk.CTkLabel(
-            detalhes_frame,
-            text=TEXTO_PADRAO_DESCRICAO,
-            anchor="nw",
-            justify="left",
-            wraplength=260
-        )
-        descricao_habilidade.pack(fill="x", anchor="nw", padx=20, pady=(0, 20))
+        def remover():
+            indice = selecionado["indice"]
+            registros = config["carregar"](personagem)
+            if indice is None or not 0 <= indice < len(registros):
+                return
+            if not messagebox.askyesno(
+                f"Remover {config['singular'].lower()}",
+                f"Deseja remover '{registros[indice]['nome']}'?"
+            ):
+                return
+            registros.pop(indice)
+            config["salvar"](personagem, registros)
+            atualizar(None)
 
-        categoria_atual = "Combatente"
-
-        def atualizar_poderes(categoria=None):
-            nonlocal categoria_atual
-            if categoria is not None:
-                categoria_atual = categoria
-
-            for widget in poderes_frame.winfo_children():
+        def atualizar_lista():
+            for widget in lista_frame.winfo_children():
                 widget.destroy()
 
-            termo_busca = busca_var.get().strip().lower()
-            poderes = [
-                poder for poder in HABILIDADES_POR_CATEGORIA.get(categoria_atual, [])
-                if termo_busca in poder.lower()
-            ]
-            if not poderes:
+            registros = config["carregar"](personagem)
+            termo = busca_entrada.get().strip().lower()
+            visiveis = [(i, r) for i, r in enumerate(registros) if termo in r["nome"].lower()]
+            if not visiveis:
                 ctk.CTkLabel(
-                    poderes_frame,
-                    text="Nenhuma habilidade encontrada.",
+                    lista_frame,
+                    text=config["vazio_lista"] if not registros else "Nada encontrado.",
                     **ESTILO_ROTULO
                 ).pack(anchor="w", padx=10, pady=10)
                 return
 
-            for poder in poderes:
+            for indice, registro in visiveis:
+                estilo = dict(ESTILO_ITEM_LISTA)
+                if indice == selecionado["indice"]:
+                    estilo["fg_color"] = CORES["destaque_suave"]
                 ctk.CTkButton(
-                    poderes_frame,
-                    text=poder,
+                    lista_frame,
+                    text=registro["nome"],
                     anchor="w",
-                    **ESTILO_ITEM_LISTA,
-                    command=lambda habilidade=poder: exibir_detalhes(habilidade)
+                    command=lambda i=indice: mostrar_detalhes(i),
+                    **estilo
                 ).pack(fill="x", padx=4, pady=1)
 
-        def exibir_detalhes(habilidade):
-            habilidade_selecionada["nome"] = habilidade
-            titulo_habilidade.configure(text=habilidade)
-            descricao_habilidade.configure(
-                text=DESCRICOES_HABILIDADES.get(
-                    habilidade,
-                    TEXTO_PADRAO_DESCRICAO
-                )
-            )
+        atualizar = mostrar_detalhes
 
-        filtro = ctk.CTkOptionMenu(
-            filtro_frame,
-            values=FILTROS_HABILIDADES,
-            command=atualizar_poderes,
-            height=36,
-            dynamic_resizing=False
-        )
-        filtro.pack(side="left", fill="x", expand=True)
-        filtro.set("Combatente")
-        atualizar_poderes("Combatente")
-        busca_var.trace_add("write", lambda *args: atualizar_poderes())
-        busca_entrada.focus_set()
+        busca_entrada.bind("<KeyRelease>", lambda event: atualizar_lista())
+        atualizar(None)
 
-    def _abrir_seletor_rituais(self, personagem, atualizar_rituais):
+    def _abrir_editor_registro(self, personagem, config, atualizar, indice=None):
+        registros = config["carregar"](personagem)
+        registro_atual = registros[indice] if indice is not None and 0 <= indice < len(registros) else None
+
         janela = ctk.CTkToplevel(self)
-        janela.title(f"Adicionar Ritual - {personagem.nome}")
-        janela.geometry("720x560")
-        janela.minsize(500, 400)
+        janela.title(f"Editar {config['singular']}" if registro_atual else config["novo"])
+        janela.geometry("560x560")
+        janela.minsize(440, 440)
         janela.grab_set()
 
-        filtros_frame = ctk.CTkFrame(janela, fg_color="transparent")
-        filtros_frame.pack(fill="x", padx=20, pady=(20, 10))
-        criar_rotulo_campo(filtros_frame, "Símbolos").pack(side="left", padx=(0, 10))
-        selecionados = set()
-        ritual_selecionado = {"nome": None, "simbolo": None}
+        conteudo = ctk.CTkFrame(janela, fg_color="transparent")
+        conteudo.pack(fill="both", expand=True, padx=20, pady=(20, 10))
+        conteudo.grid_columnconfigure(0, weight=1)
 
-        conteudo_frame = ctk.CTkFrame(janela, fg_color="transparent")
-        conteudo_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
-        conteudo_frame.grid_columnconfigure(0, weight=1)
-        conteudo_frame.grid_columnconfigure(1, weight=2)
-        conteudo_frame.grid_rowconfigure(0, weight=1)
-        rituais_frame = ctk.CTkScrollableFrame(conteudo_frame, **ESTILO_PAINEL)
-        rituais_frame.grid(row=0, column=0, sticky="nsew")
+        linha = 0
+        criar_rotulo_campo(conteudo, "Nome").grid(row=linha, column=0, sticky="w", pady=(0, 4))
+        nome_entrada = ctk.CTkEntry(conteudo, height=36, placeholder_text=f"Nome {config['do_registro']}")
+        nome_entrada.grid(row=linha + 1, column=0, sticky="ew")
+        linha += 2
 
-        detalhes_frame = ctk.CTkFrame(conteudo_frame, **ESTILO_PAINEL)
-        detalhes_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-        titulo_ritual = ctk.CTkLabel(
-            detalhes_frame,
-            text="Selecione um ritual",
-            font=fonte(19, "bold"),
-            anchor="w",
-            justify="left",
-            wraplength=240
-        )
-        titulo_ritual.pack(anchor="nw", padx=20, pady=(20, 12))
-        descricao_ritual = ctk.CTkLabel(
-            detalhes_frame,
-            text=TEXTO_PADRAO_DESCRICAO,
-            anchor="nw",
-            justify="left",
-            wraplength=240
-        )
-        descricao_ritual.pack(fill="x", anchor="nw", padx=20, pady=(0, 20))
-
-        def selecionar_ritual(ritual):
-            ritual_selecionado.update(ritual)
-            titulo_ritual.configure(text=ritual["nome"])
-            descricao_ritual.configure(
-                text=DESCRICOES_RITUAIS.get(
-                    ritual["nome"],
-                    TEXTO_PADRAO_DESCRICAO
-                )
+        elemento_menu = None
+        if config["usa_elemento"]:
+            criar_rotulo_campo(conteudo, "Elemento").grid(row=linha, column=0, sticky="w", pady=(14, 4))
+            elemento_menu = ctk.CTkOptionMenu(conteudo, values=ELEMENTOS_RITUAIS, height=36, dynamic_resizing=False)
+            elemento_menu.grid(row=linha + 1, column=0, sticky="ew")
+            elemento_menu.set(
+                registro_atual.get("simbolo")
+                if registro_atual and registro_atual.get("simbolo") in ELEMENTOS_RITUAIS
+                else ELEMENTOS_RITUAIS[0]
             )
+            linha += 2
 
-        def atualizar_lista_filtrada():
-            for widget in rituais_frame.winfo_children():
-                widget.destroy()
+        criar_rotulo_campo(conteudo, "Descrição").grid(row=linha, column=0, sticky="w", pady=(14, 4))
+        ctk.CTkLabel(
+            conteudo,
+            text="Dica: copie o texto do livro de regras de Ordem Paranormal e cole aqui.",
+            font=fonte(12),
+            anchor="w",
+            **ESTILO_ROTULO
+        ).grid(row=linha + 1, column=0, sticky="w", pady=(0, 6))
+        descricao_entrada = ctk.CTkTextbox(conteudo, wrap="word")
+        descricao_entrada.grid(row=linha + 2, column=0, sticky="nsew")
+        conteudo.grid_rowconfigure(linha + 2, weight=1)
 
-            simbolos = selecionados or set(SIMBOLOS_RITUAIS)
-            rituais_filtrados = [
-                {"nome": nome, "simbolo": simbolo}
-                for simbolo in simbolos
-                for nome in RITUAIS_POR_SIMBOLO.get(simbolo, [])
-            ]
-            if not rituais_filtrados:
-                ctk.CTkLabel(
-                    rituais_frame,
-                    text="Nenhum ritual cadastrado para os filtros selecionados.",
-                    **ESTILO_ROTULO
-                ).pack(anchor="w", padx=10, pady=10)
+        if registro_atual:
+            nome_entrada.insert(0, registro_atual["nome"])
+            descricao_entrada.insert("1.0", registro_atual["descricao"])
+
+        def salvar():
+            nome = nome_entrada.get().strip()
+            if not nome:
+                messagebox.showerror("Erro", "O nome é obrigatório.", parent=janela)
                 return
 
-            for ritual in rituais_filtrados:
-                ctk.CTkButton(
-                    rituais_frame,
-                    text=ritual["nome"],
-                    anchor="w",
-                    **ESTILO_ITEM_LISTA,
-                    command=lambda item=ritual: selecionar_ritual(item)
-                ).pack(fill="x", padx=4, pady=1)
-
-        def alternar_simbolo(simbolo, variavel):
-            if variavel.get():
-                selecionados.add(simbolo)
-            else:
-                selecionados.discard(simbolo)
-            atualizar_lista_filtrada()
-
-        for simbolo in SIMBOLOS_RITUAIS:
-            simbolo_var = ctk.BooleanVar(value=False)
-            ctk.CTkCheckBox(
-                filtros_frame,
-                text=simbolo,
-                variable=simbolo_var,
-                command=lambda nome=simbolo, valor=simbolo_var: alternar_simbolo(nome, valor)
-            ).pack(side="left", padx=(0, 12))
-
-        atualizar_lista_filtrada()
-
-        def adicionar_ritual():
-            ritual = ritual_selecionado["nome"]
-            if not ritual:
-                messagebox.showwarning("Atenção", "Selecione um ritual primeiro.")
-                return
-
-            rituais = carregar_rituais(personagem)
-            novo_ritual = ritual_selecionado.copy()
-            if not any(
-                item.get("nome") == ritual and item.get("simbolo") == novo_ritual["simbolo"]
-                for item in rituais
+            registros_atuais = config["carregar"](personagem)
+            if any(
+                i != indice and r["nome"].strip().lower() == nome.lower()
+                for i, r in enumerate(registros_atuais)
             ):
-                rituais.append(novo_ritual)
-                salvar_rituais(personagem, rituais)
-                atualizar_rituais()
-                atualizar_lista_filtrada()
+                messagebox.showerror("Erro", f"Já existe {config['artigo']} {config['singular'].lower()} com esse nome.", parent=janela)
+                return
+
+            novo_registro = {"nome": nome, "descricao": descricao_entrada.get("1.0", "end").strip()}
+            if elemento_menu is not None:
+                novo_registro["simbolo"] = elemento_menu.get()
+
+            if registro_atual:
+                registros_atuais[indice] = novo_registro
+                indice_salvo = indice
+            else:
+                registros_atuais.append(novo_registro)
+                indice_salvo = len(registros_atuais) - 1
+            config["salvar"](personagem, registros_atuais)
             janela.destroy()
+            atualizar(indice_salvo)
 
         ctk.CTkButton(
-            detalhes_frame,
-            text="+  Adicionar ritual",
-            font=fonte(13, "bold"),
-            command=adicionar_ritual
-        ).pack(side="bottom", anchor="w", padx=20, pady=20)
+            janela,
+            text="Salvar",
+            height=40,
+            font=fonte(14, "bold"),
+            command=salvar
+        ).pack(anchor="e", padx=20, pady=(0, 20))
+        nome_entrada.focus_set()
 
     def _criar_aba_inventario(self, tab_inventario, personagem):
         inventario_frame = ctk.CTkScrollableFrame(tab_inventario, fg_color="transparent")
