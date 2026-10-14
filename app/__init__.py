@@ -1,4 +1,4 @@
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 AVISO_LICENCA = (
     "Este é um conteúdo não oficial, publicado sob a Licença da Comunidade de Ordem Paranormal. "

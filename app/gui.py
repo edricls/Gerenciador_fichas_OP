@@ -571,29 +571,20 @@ class GerenciadorGUI(ctk.CTk):
         self.nex_erro_label.configure(text="")
         return True
 
-    def atualizar_trilha_opcoes(self, classe_selecionada, ajustar_nivel=True):
-        trilha_menu = self.entradas.get("trilha")
-        if trilha_menu is None:
-            return
-
-        self.nivel_label.configure(text="Estágio" if classe_selecionada == "Sobrevivente" else "Nível")
+    def atualizar_trilha_opcoes(self, classe_selecionada):
+        """Chamada ao trocar a classe: ajusta o campo de nível e depois o menu de trilhas."""
+        self.nivel_label.configure(text=obter_nome_nivel(classe_selecionada))
         nivel_texto = self.entradas["nivel"].get().strip()
         limite_inferior, limite_superior = obter_limites_nivel(classe_selecionada)
-        if ajustar_nivel and (not nivel_texto.isdigit() or not limite_inferior <= int(nivel_texto) <= limite_superior):
+        if not nivel_texto.isdigit() or not limite_inferior <= int(nivel_texto) <= limite_superior:
             self.entradas["nivel"].delete(0, "end")
             self.entradas["nivel"].insert(0, str(limite_inferior))
             self.nivel_erro_label.configure(text="")
 
-        nivel_texto = self.entradas["nivel"].get().strip()
-        if nivel_texto.isdigit() and int(nivel_texto) < 2:
-            return
-
-        trilhas = self.trilhas_por_classe.get(classe_selecionada, [])
-        trilha_menu.configure(values=trilhas)
-        if trilhas:
-            trilha_menu.set(trilhas[0])
+        self.atualizar_estado_trilha()
 
     def atualizar_estado_trilha(self):
+        """Mostra as trilhas da classe atual, ou "Nenhuma" (desabilitado) abaixo do nível 2."""
         trilha_menu = self.entradas.get("trilha")
         if trilha_menu is None:
             return
@@ -604,9 +595,12 @@ class GerenciadorGUI(ctk.CTk):
             trilha_menu.set("Nenhuma")
             return
 
-        trilha_menu.configure(state="normal")
         classe_selecionada = self.entradas["classe"].get().strip()
-        self.atualizar_trilha_opcoes(classe_selecionada, ajustar_nivel=False)
+        trilhas = self.trilhas_por_classe.get(classe_selecionada, [])
+        trilha_menu.configure(values=trilhas, state="normal")
+        # Mantém a trilha que o usuário escolheu, se ela ainda vale para a classe
+        if trilhas and trilha_menu.get() not in trilhas:
+            trilha_menu.set(trilhas[0])
 
     def criar_aba_listar(self):
         button_frame = ctk.CTkFrame(self.frame_listar, fg_color="transparent")
@@ -713,10 +707,10 @@ class GerenciadorGUI(ctk.CTk):
             elif isinstance(entrada, ctk.CTkOptionMenu):
                 if chave == "classe":
                     entrada.set("Combatente")
-                elif chave == "trilha":
-                    entrada.set(self.trilhas_por_classe["Combatente"][0])
             else:
                 entrada.delete(0, "end")
+        self.nivel_label.configure(text=obter_nome_nivel("Combatente"))
+        self.atualizar_estado_trilha()
 
     def _carregar_dados_pericias(self, personagem):
         return carregar_dados_pericias(personagem, PERICIAS, ATRIBUTOS_PERICIAS)
