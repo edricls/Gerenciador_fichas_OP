@@ -297,7 +297,7 @@ class ScrollableOriginOptionMenu(ctk.CTkOptionMenu):
 class GerenciadorGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Gerenciador de Inventário RPG")
+        self.title("Gerenciador de Fichas OP")
         self.geometry("1040x780")
         self.minsize(800, 600)
 
@@ -311,7 +311,7 @@ class GerenciadorGUI(ctk.CTk):
         )
         titulos = ctk.CTkFrame(cabecalho, fg_color="transparent")
         titulos.pack(side="left")
-        ctk.CTkLabel(titulos, text="Gerenciador de Inventário RPG", font=fonte(20, "bold"), anchor="w").pack(anchor="w")
+        ctk.CTkLabel(titulos, text="Gerenciador de Fichas OP", font=fonte(20, "bold"), anchor="w").pack(anchor="w")
         ctk.CTkLabel(
             titulos,
             text="Crie, consulte e edite as fichas dos seus personagens",

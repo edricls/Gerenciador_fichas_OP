@@ -12,7 +12,7 @@ from app.models import Personagem
 
 class NomeDuplicadoTest(unittest.TestCase):
     def setUp(self):
-        # Banco em memória, para os testes não tocarem no rpg.db.
+        # Banco em memória, para os testes não tocarem no fichas_op.db.
         engine = create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},

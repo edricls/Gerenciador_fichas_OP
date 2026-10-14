@@ -19,7 +19,7 @@ def iniciar_sistema():
 
     # LOOP do jogo
     while True:
-        console.print("\n[bold blue]=== GERENCIADOR DE INVENTÁRIO RPG ===[/bold blue]")
+        console.print("\n[bold blue]=== GERENCIADOR DE FICHAS OP ===[/bold blue]")
         print("1. Criar Novo Personagem")
         print("2. Listar Personagens Existentes")
         print("3. Sair")
