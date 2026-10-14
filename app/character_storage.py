@@ -1,5 +1,7 @@
 import json
 
+from sqlalchemy.exc import IntegrityError
+
 from app.database import SessionLocal
 from app.imagem_storage import apagar_arquivo_imagem
 from app.models import Personagem
@@ -13,11 +15,32 @@ def listar_personagens():
         db.close()
 
 
+class NomePersonagemDuplicadoError(Exception):
+    """O nome escolhido já pertence a outro personagem."""
+
+
+def existe_personagem_com_nome(nome):
+    # Comparação em Python (casefold) para tratar acentos corretamente, o que o lower() do SQLite não faz.
+    nome_normalizado = nome.strip().casefold()
+    db = SessionLocal()
+    try:
+        return any(
+            (nome_existente or "").strip().casefold() == nome_normalizado
+            for (nome_existente,) in db.query(Personagem.nome)
+        )
+    finally:
+        db.close()
+
+
 def salvar_personagem(personagem):
     db = SessionLocal()
     try:
         db.add(personagem)
         db.commit()
+    except IntegrityError as erro:
+        # O nome é único no banco; qualquer violação aqui é um nome repetido.
+        db.rollback()
+        raise NomePersonagemDuplicadoError(personagem.nome) from erro
     finally:
         db.close()
 

@@ -2,6 +2,11 @@
 #É o arquivo que você vai executar no terminal usando o comando python -m app.main.
 from app.database import engine, Base, SessionLocal, ensure_database_schema
 from app.models import Personagem
+from app.character_storage import (
+    NomePersonagemDuplicadoError,
+    existe_personagem_com_nome,
+    salvar_personagem,
+)
 from rich.console import Console # Usando a biblioteca Rich que você instalou
 from app.gui import iniciar_gui
 
@@ -31,6 +36,10 @@ def iniciar_sistema():
                 if not nome_input.strip() or not classe_input.strip():
                     console.print("[bold red]Erro: Nome e Classe não podem estar vazios![/bold red]")
                     continue
+
+                if existe_personagem_com_nome(nome_input):
+                    console.print("[bold red]Erro: Um personagem com este nome já existe.[/bold red]")
+                    continue
                 
                 nivel_input = int(input("Digite o nível: "))
                 nex_input = int(input("Digite o NEX: "))
@@ -42,13 +51,12 @@ def iniciar_sistema():
                 novo_p = Personagem(nome=nome_input, classe=classe_input, nivel=nivel_input, nex=nex_input, atributos=atributos_input, trilha=trilha_input, historia=historia_input)
 
                 # Salva no banco
-                db = SessionLocal()
-                db.add(novo_p)
-                db.commit()
-                db.close()
+                salvar_personagem(novo_p)
 
                 console.print(f"[bold green]Sucesso:[/] {nome_input} foi salvo no banco de dados!")
-            
+
+            except NomePersonagemDuplicadoError:
+                console.print("[bold red]Erro: Um personagem com este nome já existe.[/bold red]")
             except ValueError:
                 console.print("[bold red]Erro: Nível e NEX devem ser números inteiros![/bold red]")
             except Exception as e:

@@ -15,6 +15,8 @@ from app.character_rules import (
     obter_limite_categoria,
 )
 from app.character_storage import (
+    NomePersonagemDuplicadoError,
+    existe_personagem_com_nome,
     atualizar_personagem,
     carregar_habilidades,
     carregar_rituais,
@@ -182,6 +184,8 @@ def criar_tabview(master, **kwargs):
     tabview._segmented_button.configure(font=fonte(13, "bold"))
     return tabview
 
+
+MENSAGEM_NOME_DUPLICADO = "Um personagem com este nome já existe."
 
 CONFIG_HABILIDADES = {
     "titulo": "Habilidades",
@@ -566,6 +570,10 @@ class GerenciadorGUI(ctk.CTk):
                 messagebox.showerror("Erro", "Nome e Classe são obrigatórios!")
                 return
 
+            if existe_personagem_com_nome(nome):
+                messagebox.showerror("Erro", MENSAGEM_NOME_DUPLICADO)
+                return
+
             nivel_texto = self.entradas["nivel"].get().strip()
             # Garantir que o texto do nível tenha no máximo 2 caracteres
             if len(nivel_texto) > 2:
@@ -626,6 +634,8 @@ class GerenciadorGUI(ctk.CTk):
             self.nex_erro_label.configure(text="")
             self.atualizar_lista()
 
+        except NomePersonagemDuplicadoError:
+            messagebox.showerror("Erro", MENSAGEM_NOME_DUPLICADO)
         except ValueError:
             messagebox.showerror("Erro", "Nível, NEX e atributos devem ser números!")
         except Exception as e:
