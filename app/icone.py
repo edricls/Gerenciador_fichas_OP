@@ -5,9 +5,9 @@ from functools import lru_cache
 from pathlib import Path
 
 import customtkinter as ctk
-from PIL import Image, ImageChops, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from app.theme import CORES_ELEMENTOS
+from app.theme import CORES, CORES_ELEMENTOS
 
 ICONE_PNG = Path(__file__).parent / "assets" / "medo.png"
 PASTA_ICO = Path(tempfile.gettempdir())
@@ -64,6 +64,32 @@ def _caminho_ico(modo):
         imagens = [_imagem_ico(base, tamanho, cor) for tamanho in ENGROSSAR_ICO]
         imagens[-1].save(caminho, sizes=[i.size for i in imagens], append_images=imagens[:-1])
     return str(caminho)
+
+
+def _ladrilho(base, tamanho):
+    """Símbolo branco sobre um quadrado escuro arredondado, legível em qualquer fundo."""
+    lado = 256
+    ladrilho = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    ImageDraw.Draw(ladrilho).rounded_rectangle((0, 0, lado - 1, lado - 1), radius=56, fill=CORES["superficie"][1])
+    interno = int(lado * 0.74)
+    mascara = _mascara(base).resize((interno, interno), Image.LANCZOS)
+    if ENGROSSAR_ICO[tamanho] > 1:
+        mascara = mascara.filter(ImageFilter.MaxFilter(ENGROSSAR_ICO[tamanho]))
+    simbolo = Image.new("RGBA", (interno, interno), "#FFFFFF")
+    simbolo.putalpha(mascara)
+    ladrilho.alpha_composite(simbolo, ((lado - interno) // 2, (lado - interno) // 2))
+    return ladrilho.resize((tamanho, tamanho), Image.LANCZOS)
+
+
+def gerar_ico_executavel(destino):
+    """Gera o .ico do executável e do instalador (usado no build, não pelo app em execução)."""
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(ICONE_PNG) as arquivo:
+        base = _quadrado(arquivo.convert("RGBA"))
+    imagens = [_ladrilho(base, tamanho) for tamanho in ENGROSSAR_ICO]
+    imagens[-1].save(destino, sizes=[i.size for i in imagens], append_images=imagens[:-1])
+    return destino
 
 
 def aplicar_icone(janela):

@@ -3,7 +3,6 @@ venv/
 imagens/
 build/
 dist/
-*.spec
 # Arquivos compilados do Python (gerados automaticamente)
 __pycache__/
 *.pyc
