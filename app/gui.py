@@ -13,7 +13,6 @@ from app.character_rules import (
     contar_itens_por_categoria,
     obter_forca,
     obter_limite_categoria,
-    validar_limite_categoria,
 )
 from app.character_storage import (
     atualizar_personagem,
@@ -1512,17 +1511,9 @@ class GerenciadorGUI(ctk.CTk):
                 messagebox.showerror("Erro", "O peso deve ser um número maior ou igual a zero.", parent=janela)
                 return
 
+            # Passar do limite da patente é permitido; a aba destaca a categoria excedida em vermelho.
             itens_atuais = carregar_inventario(personagem)
             categoria = categoria_menu.get()
-            erro_limite = validar_limite_categoria(
-                itens_atuais,
-                carregar_patente(personagem),
-                categoria,
-                ignorar_indice=indice if item_atual else None,
-            )
-            if erro_limite:
-                messagebox.showerror("Limite atingido", erro_limite, parent=janela)
-                return
 
             novo_item = {
                 "nome": nome,

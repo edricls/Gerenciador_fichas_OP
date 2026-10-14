@@ -165,20 +165,3 @@ def calcular_peso_total(itens):
         except (TypeError, ValueError):
             pass
     return total
-
-
-def validar_limite_categoria(itens, patente, categoria, ignorar_indice=None):
-    """Retorna uma mensagem de erro se adicionar um item da categoria ultrapassar o limite da patente."""
-    limite = obter_limite_categoria(patente, categoria)
-    if limite is None:
-        return None
-    quantidade = sum(
-        1
-        for indice, item in enumerate(itens)
-        if indice != ignorar_indice and item.get("categoria", "0") == categoria
-    )
-    if quantidade >= limite:
-        if limite == 0:
-            return f"A patente {patente} não permite itens de categoria {categoria}."
-        return f"A patente {patente} permite no máximo {limite} item(ns) de categoria {categoria}."
-    return None

@@ -5,7 +5,6 @@ from app.character_rules import (
     calcular_peso_total,
     contar_itens_por_categoria,
     obter_limite_categoria,
-    validar_limite_categoria,
 )
 
 
@@ -45,21 +44,8 @@ class LimitesPatenteTest(unittest.TestCase):
             for categoria, limite in zip(("I", "II", "III", "IV"), limites):
                 self.assertEqual(obter_limite_categoria(patente, categoria), limite, (patente, categoria))
 
-    def test_bloqueia_quando_limite_atingido(self):
-        itens = [{"nome": "A", "categoria": "I"}, {"nome": "B", "categoria": "I"}]
-        self.assertIsNotNone(validar_limite_categoria(itens, "Recruta", "I"))
-        self.assertIsNone(validar_limite_categoria(itens, "Operador", "I"))
-
-    def test_bloqueia_categoria_nao_permitida(self):
-        self.assertIsNotNone(validar_limite_categoria([], "Recruta", "II"))
-
-    def test_edicao_ignora_o_proprio_item(self):
-        itens = [{"nome": "A", "categoria": "I"}, {"nome": "B", "categoria": "I"}]
-        self.assertIsNone(validar_limite_categoria(itens, "Recruta", "I", ignorar_indice=1))
-
-    def test_categoria_zero_nunca_bloqueia(self):
-        itens = [{"nome": str(i), "categoria": "0"} for i in range(50)]
-        self.assertIsNone(validar_limite_categoria(itens, "Mundano", "0"))
+    def test_patente_desconhecida_usa_limites_de_recruta(self):
+        self.assertEqual(obter_limite_categoria("Patente Inexistente", "I"), 2)
 
 
 class ContagemTest(unittest.TestCase):
