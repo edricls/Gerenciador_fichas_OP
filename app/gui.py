@@ -1,6 +1,6 @@
 ﻿import json
 import customtkinter as ctk
-from tkinter import messagebox, StringVar
+from tkinter import filedialog, messagebox, StringVar
 from app.character_rules import (
     calcular_pv_pd,
     calcular_recursos,
@@ -38,6 +38,20 @@ from app.gui_data import (
     CATEGORIAS_ITENS,
     TIPOS_ITENS,
 )
+from app.imagem_storage import (
+    AJUSTE_PADRAO,
+    TIPOS_SUPORTADOS,
+    ZOOM_MAXIMO,
+    abrir_imagem,
+    calcular_recorte,
+    caminho_imagem,
+    carregar_ajuste,
+    carregar_imagem_circular,
+    definir_imagem,
+    recortar_circular,
+    remover_imagem,
+    salvar_ajuste,
+)
 from app.inventario_storage import (
     carregar_inventario,
     carregar_patente,
@@ -69,7 +83,8 @@ from app.theme import (
 aplicar_tema()
 
 
-def criar_avatar(master, nome, tamanho):
+def criar_avatar(master, nome, tamanho, caminho=None, ajuste=None):
+    """Avatar circular com a foto do personagem ou, sem foto, as iniciais do nome."""
     avatar = ctk.CTkFrame(
         master,
         width=tamanho,
@@ -79,12 +94,28 @@ def criar_avatar(master, nome, tamanho):
     )
     avatar.grid_propagate(False)
     avatar.pack_propagate(False)
-    ctk.CTkLabel(
-        avatar,
-        text=iniciais(nome),
-        text_color=CORES["destaque"],
-        font=fonte(max(tamanho // 3, 14), "bold"),
-    ).place(relx=0.5, rely=0.5, anchor="center")
+
+    foto = None
+    if caminho is not None:
+        try:
+            imagem = carregar_imagem_circular(caminho, tamanho, ajuste)
+            foto = ctk.CTkImage(light_image=imagem, dark_image=imagem, size=(tamanho, tamanho))
+        except (OSError, ValueError):
+            foto = None
+
+    if foto is not None:
+        # Sem fundo próprio, para o recorte circular da foto não ganhar cantos quadrados.
+        avatar.configure(fg_color="transparent")
+        conteudo = ctk.CTkLabel(avatar, text="", image=foto, fg_color="transparent")
+    else:
+        conteudo = ctk.CTkLabel(
+            avatar,
+            text=iniciais(nome),
+            text_color=CORES["destaque"],
+            font=fonte(max(tamanho // 3, 14), "bold"),
+        )
+    conteudo.place(relx=0.5, rely=0.5, anchor="center")
+    avatar.conteudo = conteudo
     return avatar
 
 
@@ -651,7 +682,85 @@ class GerenciadorGUI(ctk.CTk):
         header_frame.pack(fill="x", padx=20, pady=(20, 12))
         header_frame.grid_columnconfigure(1, weight=1)
 
-        criar_avatar(header_frame, personagem.nome, 84).grid(row=0, column=0, rowspan=2, padx=(20, 16), pady=18)
+        foto_widgets = {"avatar": None}
+        foto_acoes = ctk.CTkFrame(header_frame, fg_color="transparent")
+        foto_acoes.grid(row=0, column=2, rowspan=2, padx=20)
+        botao_alterar_foto = ctk.CTkButton(
+            foto_acoes,
+            text="Alterar foto",
+            width=120,
+            command=lambda: escolher_foto(),
+            **ESTILO_BOTAO_SECUNDARIO
+        )
+        botao_alterar_foto.pack(pady=(0, 6))
+        botao_ajustar_foto = ctk.CTkButton(
+            foto_acoes,
+            text="Ajustar foto",
+            width=120,
+            command=lambda: ajustar_foto(),
+            **ESTILO_BOTAO_SECUNDARIO
+        )
+        botao_remover_foto = ctk.CTkButton(
+            foto_acoes,
+            text="Remover foto",
+            width=120,
+            command=lambda: remover_foto(),
+            **ESTILO_BOTAO_PERIGO_CONTORNO
+        )
+
+        def atualizar_foto():
+            if foto_widgets["avatar"] is not None:
+                foto_widgets["avatar"].destroy()
+            caminho = caminho_imagem(personagem)
+            avatar = criar_avatar(header_frame, personagem.nome, 84, caminho, carregar_ajuste(personagem))
+            avatar.grid(row=0, column=0, rowspan=2, padx=(20, 16), pady=18)
+            # Clicar no avatar ajusta a foto existente ou, sem foto, abre a escolha de uma.
+            for widget in (avatar, avatar.conteudo):
+                widget.configure(cursor="hand2")
+                widget.bind("<Button-1>", lambda event: ajustar_foto() if caminho_imagem(personagem) else escolher_foto())
+            foto_widgets["avatar"] = avatar
+            botao_alterar_foto.configure(text="Alterar foto" if caminho else "Adicionar foto")
+            if caminho:
+                botao_ajustar_foto.pack(pady=(0, 6))
+                botao_remover_foto.pack()
+            else:
+                botao_ajustar_foto.pack_forget()
+                botao_remover_foto.pack_forget()
+
+        def foto_alterada():
+            atualizar_foto()
+            self.atualizar_lista()
+
+        def ajustar_foto():
+            self._abrir_ajuste_foto(personagem, ficha, foto_alterada)
+
+        def escolher_foto():
+            arquivo = filedialog.askopenfilename(
+                parent=ficha,
+                title=f"Escolher foto de {personagem.nome}",
+                filetypes=TIPOS_SUPORTADOS,
+            )
+            if not arquivo:
+                return
+            try:
+                definir_imagem(personagem, arquivo)
+            except ValueError as erro:
+                messagebox.showerror("Erro", str(erro), parent=ficha)
+                return
+            except OSError as erro:
+                messagebox.showerror("Erro", f"Não foi possível salvar a foto: {erro}", parent=ficha)
+                return
+            foto_alterada()
+            ajustar_foto()
+
+        def remover_foto():
+            if not messagebox.askyesno("Remover foto", "Deseja remover a foto deste personagem?", parent=ficha):
+                return
+            remover_imagem(personagem)
+            atualizar_foto()
+            self.atualizar_lista()
+
+        atualizar_foto()
 
         ctk.CTkLabel(header_frame, text=personagem.nome, font=fonte(24, "bold"), anchor="w").grid(
             row=0, column=1, sticky="sw", pady=(18, 0)
@@ -797,6 +906,121 @@ class GerenciadorGUI(ctk.CTk):
         )
 
         self._criar_aba_pericias(tab_pericias, personagem, ficha, esquiva_var, bloqueio_var)
+
+    def _abrir_ajuste_foto(self, personagem, janela_pai, ao_salvar):
+        """Janela para enquadrar a foto: arrastar move, roda do mouse/controle aproxima."""
+        caminho = caminho_imagem(personagem)
+        if caminho is None:
+            return
+        try:
+            original = abrir_imagem(caminho)
+        except (OSError, ValueError):
+            messagebox.showerror("Erro", "Não foi possível abrir a foto.", parent=janela_pai)
+            return
+
+        _, ajuste = calcular_recorte(original.width, original.height, carregar_ajuste(personagem))
+        tamanho_previa = 280
+
+        janela = ctk.CTkToplevel(self)
+        janela.title(f"Ajustar foto - {personagem.nome}")
+        janela.geometry("420x500")
+        janela.resizable(False, False)
+        janela.transient(janela_pai)
+        janela.grab_set()
+
+        ctk.CTkLabel(janela, text="Ajustar foto", font=fonte(17, "bold")).pack(pady=(20, 2))
+        ctk.CTkLabel(
+            janela,
+            text="Arraste a imagem para posicionar e use a roda do mouse ou o controle abaixo para aproximar.",
+            font=fonte(12),
+            wraplength=360,
+            **ESTILO_ROTULO
+        ).pack(padx=20)
+
+        moldura = ctk.CTkFrame(
+            janela,
+            width=tamanho_previa,
+            height=tamanho_previa,
+            fg_color="transparent",
+        )
+        moldura.pack(pady=16)
+        moldura.pack_propagate(False)
+        previa = ctk.CTkLabel(moldura, text="", fg_color="transparent", cursor="fleur")
+        previa.place(relx=0.5, rely=0.5, anchor="center")
+
+        controle_zoom = ctk.CTkFrame(janela, fg_color="transparent")
+        controle_zoom.pack(fill="x", padx=40)
+        ctk.CTkLabel(controle_zoom, text="−", font=fonte(16, "bold"), **ESTILO_ROTULO).pack(side="left")
+        zoom_slider = ctk.CTkSlider(controle_zoom, from_=1.0, to=ZOOM_MAXIMO)
+        zoom_slider.pack(side="left", fill="x", expand=True, padx=10)
+        ctk.CTkLabel(controle_zoom, text="+", font=fonte(16, "bold"), **ESTILO_ROTULO).pack(side="left")
+
+        def renderizar():
+            imagem = recortar_circular(original, tamanho_previa, ajuste)
+            foto = ctk.CTkImage(light_image=imagem, dark_image=imagem, size=(tamanho_previa, tamanho_previa))
+            previa.configure(image=foto)
+            previa.foto = foto
+
+        def aplicar(novo_ajuste):
+            _, corrigido = calcular_recorte(original.width, original.height, novo_ajuste)
+            ajuste.update(corrigido)
+            renderizar()
+
+        def definir_zoom(valor):
+            aplicar({**ajuste, "zoom": float(valor)})
+
+        arrasto = {"x": 0, "y": 0}
+
+        def iniciar_arrasto(event):
+            arrasto["x"], arrasto["y"] = event.x_root, event.y_root
+
+        def arrastar(event):
+            dx = event.x_root - arrasto["x"]
+            dy = event.y_root - arrasto["y"]
+            arrasto["x"], arrasto["y"] = event.x_root, event.y_root
+            # Converte o movimento na tela em pixels da imagem original.
+            lado_recorte = min(original.width, original.height) / ajuste["zoom"]
+            pixels_por_ponto = lado_recorte / max(previa.winfo_width(), 1)
+            aplicar({
+                **ajuste,
+                "x": ajuste["x"] - dx * pixels_por_ponto / original.width,
+                "y": ajuste["y"] - dy * pixels_por_ponto / original.height,
+            })
+
+        def rolar(event):
+            fator = 1.1 if event.delta > 0 else 1 / 1.1
+            aplicar({**ajuste, "zoom": ajuste["zoom"] * fator})
+            zoom_slider.set(ajuste["zoom"])
+
+        def centralizar():
+            aplicar(dict(AJUSTE_PADRAO))
+            zoom_slider.set(ajuste["zoom"])
+
+        def fechar():
+            janela.destroy()
+            if janela_pai.winfo_exists():
+                janela_pai.grab_set()
+
+        def salvar():
+            salvar_ajuste(personagem, ajuste)
+            fechar()
+            ao_salvar()
+
+        zoom_slider.configure(command=definir_zoom)
+        zoom_slider.set(ajuste["zoom"])
+        previa.bind("<ButtonPress-1>", iniciar_arrasto)
+        previa.bind("<B1-Motion>", arrastar)
+        previa.bind("<MouseWheel>", rolar)
+        zoom_slider.bind("<MouseWheel>", rolar)
+        janela.protocol("WM_DELETE_WINDOW", fechar)
+
+        botoes = ctk.CTkFrame(janela, fg_color="transparent")
+        botoes.pack(fill="x", padx=20, pady=(20, 20))
+        ctk.CTkButton(botoes, text="Centralizar", width=110, command=centralizar, **ESTILO_BOTAO_SECUNDARIO).pack(side="left")
+        ctk.CTkButton(botoes, text="Salvar", width=110, font=fonte(13, "bold"), command=salvar).pack(side="right")
+        ctk.CTkButton(botoes, text="Cancelar", width=110, command=fechar, **ESTILO_BOTAO_SECUNDARIO).pack(side="right", padx=(0, 8))
+
+        renderizar()
 
     def _criar_aba_registros(self, tab, personagem, config):
         """Aba de habilidades ou rituais cadastrados pelo próprio usuário."""
@@ -1712,7 +1936,7 @@ class GerenciadorGUI(ctk.CTk):
                 card.pack(fill="x", padx=6, pady=6)
                 card.grid_columnconfigure(1, weight=1)
 
-                criar_avatar(card, personagem.nome, 64).grid(row=0, column=0, rowspan=2, padx=(18, 14), pady=16)
+                criar_avatar(card, personagem.nome, 64, caminho_imagem(personagem), carregar_ajuste(personagem)).grid(row=0, column=0, rowspan=2, padx=(18, 14), pady=16)
 
                 ctk.CTkLabel(card, text=personagem.nome, font=fonte(17, "bold"), anchor="w").grid(
                     row=0, column=1, sticky="sw", pady=(16, 2)

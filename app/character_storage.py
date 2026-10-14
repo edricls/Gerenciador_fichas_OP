@@ -1,6 +1,7 @@
 import json
 
 from app.database import SessionLocal
+from app.imagem_storage import apagar_arquivo_imagem
 from app.models import Personagem
 
 
@@ -69,6 +70,7 @@ def remover_personagem(personagem):
         db.commit()
     finally:
         db.close()
+    apagar_arquivo_imagem(getattr(personagem, "imagem", None))
 
 
 def _carregar_lista_json(texto):

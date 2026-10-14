@@ -23,6 +23,8 @@ class Personagem(Base):
     rituais = Column(String, default="[]")  # Rituais do personagem em formato JSON
     patente = Column(String, default="Recruta")  # Patente do personagem na Ordem
     inventario = Column(String, default="[]")  # Itens do inventário em formato JSON
+    imagem = Column(String, default="")  # Nome do arquivo da foto, dentro da pasta de imagens
+    imagem_ajuste = Column(String, default="")  # Enquadramento da foto (centro e zoom) em formato JSON
     
     
 

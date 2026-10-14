@@ -98,6 +98,12 @@ def aplicar_tema():
         fg_color=CORES["superficie_alt"],
         progress_color=CORES["destaque"],
     )
+    tema["CTkSlider"].update(
+        fg_color=CORES["superficie_alt"],
+        progress_color=CORES["destaque"],
+        button_color=CORES["destaque"],
+        button_hover_color=CORES["destaque_hover"],
+    )
     tema["CTkScrollbar"].update(
         button_color=CORES["borda"],
         button_hover_color=CORES["texto_suave"],

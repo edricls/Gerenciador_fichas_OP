@@ -68,6 +68,18 @@ def ensure_database_schema():
                 text("ALTER TABLE personagens ADD COLUMN inventario VARCHAR DEFAULT '[]'")
             )
 
+    if "imagem" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE personagens ADD COLUMN imagem VARCHAR DEFAULT ''")
+            )
+
+    if "imagem_ajuste" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE personagens ADD COLUMN imagem_ajuste VARCHAR DEFAULT ''")
+            )
+
 
 def get_db():
     """Função utilitária para abrir e fechar a sessão do banco com segurança"""
