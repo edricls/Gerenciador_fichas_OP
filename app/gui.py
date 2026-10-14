@@ -1,6 +1,10 @@
 ﻿import json
+import os
+import sys
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, StringVar
+from app import AVISO_LICENCA, __version__
+from app.caminhos import NOME_APP, PASTA_DADOS
 from app.character_rules import (
     calcular_pv_pd,
     calcular_recursos,
@@ -325,10 +329,22 @@ class GerenciadorGUI(ctk.CTk):
             anchor="w",
             **ESTILO_ROTULO
         ).pack(anchor="w")
+        ctk.CTkButton(
+            cabecalho, text="Sobre", width=80, command=self.abrir_sobre, **ESTILO_BOTAO_SECUNDARIO
+        ).pack(side="right")
+        criar_chip(cabecalho, f"v{__version__}").pack(side="right", padx=(0, 10))
+
+        # Rodapé empacotado antes das abas, para continuar visível quando a janela encolher
+        ctk.CTkLabel(
+            self,
+            text="Conteúdo não oficial, publicado sob a Licença da Comunidade de Ordem Paranormal.",
+            font=fonte(11),
+            **ESTILO_ROTULO
+        ).pack(side="bottom", pady=(0, 10))
 
         # Criar abas
         self.notebook = criar_tabview(self, width=900, height=640)
-        self.notebook.pack(padx=20, pady=(8, 20), fill="both", expand=True)
+        self.notebook.pack(padx=20, pady=(8, 6), fill="both", expand=True)
 
         self.notebook.add("Criar Personagem")
         self.notebook.add("Listar Personagens")
@@ -338,6 +354,49 @@ class GerenciadorGUI(ctk.CTk):
 
         self.criar_aba_criar()
         self.criar_aba_listar()
+
+    def abrir_sobre(self):
+        janela = ctk.CTkToplevel(self)
+        aplicar_icone(janela)
+        janela.title("Sobre")
+        janela.geometry("440x420")
+        janela.resizable(False, False)
+        janela.transient(self)
+        janela.grab_set()
+
+        simbolo = criar_imagem_icone(64)
+        if simbolo is not None:
+            ctk.CTkLabel(janela, text="", image=simbolo).pack(pady=(24, 8))
+        ctk.CTkLabel(janela, text=NOME_APP, font=fonte(18, "bold")).pack(pady=(0 if simbolo else 24, 0))
+        ctk.CTkLabel(janela, text=f"Versão {__version__}", font=fonte(12), **ESTILO_ROTULO).pack()
+        ctk.CTkLabel(janela, text="© 2026 Edric Leoni Savio · Licença Apache 2.0", font=fonte(12), **ESTILO_ROTULO).pack(
+            pady=(2, 14)
+        )
+
+        aviso = ctk.CTkFrame(janela, **ESTILO_PAINEL)
+        aviso.pack(fill="x", padx=24)
+        ctk.CTkLabel(aviso, text=AVISO_LICENCA, font=fonte(12), wraplength=360, justify="left").pack(
+            padx=14, pady=12
+        )
+
+        criar_rotulo_campo(janela, "Seus dados ficam em").pack(fill="x", padx=24, pady=(16, 2))
+        ctk.CTkLabel(
+            janela, text=str(PASTA_DADOS), font=fonte(11), anchor="w", wraplength=390, justify="left", **ESTILO_ROTULO
+        ).pack(fill="x", padx=24)
+
+        botoes = ctk.CTkFrame(janela, fg_color="transparent")
+        botoes.pack(side="bottom", fill="x", padx=24, pady=20)
+        ctk.CTkButton(botoes, text="Fechar", width=100, command=janela.destroy).pack(side="right")
+        ctk.CTkButton(
+            botoes, text="Abrir pasta de dados", command=self.abrir_pasta_dados, **ESTILO_BOTAO_SECUNDARIO
+        ).pack(side="left")
+
+    def abrir_pasta_dados(self):
+        PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+        if sys.platform.startswith("win"):
+            os.startfile(PASTA_DADOS)
+        else:
+            messagebox.showinfo("Pasta de dados", str(PASTA_DADOS))
 
     def criar_aba_criar(self):
         self.trilhas_por_classe = TRILHAS_POR_CLASSE
