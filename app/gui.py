@@ -39,6 +39,7 @@ from app.gui_data import (
     CATEGORIAS_ITENS,
     TIPOS_ITENS,
 )
+from app.icone import aplicar_icone, criar_imagem_icone
 from app.imagem_storage import (
     AJUSTE_PADRAO,
     TIPOS_SUPORTADOS,
@@ -298,17 +299,22 @@ class GerenciadorGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Gerenciador de Fichas OP")
+        aplicar_icone(self)
         self.geometry("1040x780")
         self.minsize(800, 600)
 
         cabecalho = ctk.CTkFrame(self, fg_color="transparent")
         cabecalho.pack(fill="x", padx=28, pady=(22, 0))
-        marca = ctk.CTkFrame(cabecalho, width=40, height=40, corner_radius=12, fg_color=CORES["destaque"])
-        marca.pack(side="left", padx=(0, 14))
-        marca.pack_propagate(False)
-        ctk.CTkLabel(marca, text="◈", font=fonte(20, "bold"), text_color=CORES["texto_claro"]).place(
-            relx=0.5, rely=0.5, anchor="center"
-        )
+        simbolo = criar_imagem_icone(40)
+        if simbolo is not None:
+            ctk.CTkLabel(cabecalho, text="", image=simbolo).pack(side="left", padx=(0, 14))
+        else:
+            marca = ctk.CTkFrame(cabecalho, width=40, height=40, corner_radius=12, fg_color=CORES["destaque"])
+            marca.pack(side="left", padx=(0, 14))
+            marca.pack_propagate(False)
+            ctk.CTkLabel(marca, text="◈", font=fonte(20, "bold"), text_color=CORES["texto_claro"]).place(
+                relx=0.5, rely=0.5, anchor="center"
+            )
         titulos = ctk.CTkFrame(cabecalho, fg_color="transparent")
         titulos.pack(side="left")
         ctk.CTkLabel(titulos, text="Gerenciador de Fichas OP", font=fonte(20, "bold"), anchor="w").pack(anchor="w")
@@ -682,6 +688,7 @@ class GerenciadorGUI(ctk.CTk):
 
     def abrir_ficha(self, personagem):
         ficha = ctk.CTkToplevel(self)
+        aplicar_icone(ficha)
         ficha.title(f"Ficha de {personagem.nome}")
         ficha.geometry("820x760")
         ficha.minsize(680, 560)
@@ -931,6 +938,7 @@ class GerenciadorGUI(ctk.CTk):
         tamanho_previa = 280
 
         janela = ctk.CTkToplevel(self)
+        aplicar_icone(janela)
         janela.title(f"Ajustar foto - {personagem.nome}")
         janela.geometry("420x500")
         janela.resizable(False, False)
@@ -1183,6 +1191,7 @@ class GerenciadorGUI(ctk.CTk):
         registro_atual = registros[indice] if indice is not None and 0 <= indice < len(registros) else None
 
         janela = ctk.CTkToplevel(self)
+        aplicar_icone(janela)
         janela.title(f"Editar {config['singular']}" if registro_atual else config["novo"])
         janela.geometry("560x560")
         janela.minsize(440, 440)
@@ -1466,6 +1475,7 @@ class GerenciadorGUI(ctk.CTk):
         item_atual = itens[indice] if indice is not None and 0 <= indice < len(itens) else None
 
         janela = ctk.CTkToplevel(self)
+        aplicar_icone(janela)
         janela.title("Editar Item" if item_atual else f"Adicionar Item - {personagem.nome}")
         janela.geometry("460x540")
         janela.minsize(400, 480)
