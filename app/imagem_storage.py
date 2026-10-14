@@ -3,14 +3,13 @@
 import json
 import time
 from functools import lru_cache
-from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageOps
 
+from app.caminhos import PASTA_IMAGENS
 from app.database import SessionLocal
 from app.models import Personagem
 
-PASTA_IMAGENS = Path("imagens")
 TAMANHO_MAXIMO = 1024
 ZOOM_MAXIMO = 4.0
 AJUSTE_PADRAO = {"x": 0.5, "y": 0.5, "zoom": 1.0}
@@ -66,7 +65,7 @@ def definir_imagem(personagem, caminho_origem):
     except (OSError, ValueError) as erro:
         raise ValueError("O arquivo escolhido não é uma imagem válida.") from erro
 
-    PASTA_IMAGENS.mkdir(exist_ok=True)
+    PASTA_IMAGENS.mkdir(parents=True, exist_ok=True)
     # Nome único a cada troca, para não reaproveitar uma imagem antiga já carregada.
     nome_arquivo = f"personagem_{personagem.id}_{int(time.time() * 1000)}.png"
     imagem.save(PASTA_IMAGENS / nome_arquivo, "PNG")

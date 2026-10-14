@@ -1,14 +1,14 @@
-import os
-
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Bancos criados antes da renomeação do projeto usavam rpg.db; reaproveita o arquivo antigo
-if os.path.exists("rpg.db") and not os.path.exists("fichas_op.db"):
-    os.replace("rpg.db", "fichas_op.db")
+from app.caminhos import CAMINHO_BANCO, PASTA_DADOS, migrar_dados_antigos
 
-# Cria a conexão com o banco de dados SQLite local
-DATABASE_URL = "sqlite:///fichas_op.db"
+# Traz o banco e as fotos de versões anteriores, que ficavam na pasta do projeto
+migrar_dados_antigos()
+PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+
+# Cria a conexão com o banco de dados SQLite, na pasta de dados do usuário
+DATABASE_URL = f"sqlite:///{CAMINHO_BANCO.as_posix()}"
 
 # O engine é o motor que gerencia a comunicação com o arquivo .db
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
